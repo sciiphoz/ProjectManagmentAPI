@@ -1,0 +1,9 @@
+C:\Users\sciiphoz\source\repos\ProjectManagmentAPI\ProjectManagmentAPI\obj\Debug\net8.0\ProjectManagmentAPI.csproj.AssemblyReference.cache
+C:\Users\sciiphoz\source\repos\ProjectManagmentAPI\ProjectManagmentAPI\obj\Debug\net8.0\rpswa.dswa.cache.json
+C:\Users\sciiphoz\source\repos\ProjectManagmentAPI\ProjectManagmentAPI\obj\Debug\net8.0\ProjectManagmentAPI.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\sciiphoz\source\repos\ProjectManagmentAPI\ProjectManagmentAPI\obj\Debug\net8.0\ProjectManagmentAPI.AssemblyInfoInputs.cache
+C:\Users\sciiphoz\source\repos\ProjectManagmentAPI\ProjectManagmentAPI\obj\Debug\net8.0\ProjectManagmentAPI.AssemblyInfo.cs
+C:\Users\sciiphoz\source\repos\ProjectManagmentAPI\ProjectManagmentAPI\obj\Debug\net8.0\ProjectManagmentAPI.csproj.CoreCompileInputs.cache
+C:\Users\sciiphoz\source\repos\ProjectManagmentAPI\ProjectManagmentAPI\obj\Debug\net8.0\ProjectManagmentAPI.MvcApplicationPartsAssemblyInfo.cs
+C:\Users\sciiphoz\source\repos\ProjectManagmentAPI\ProjectManagmentAPI\obj\Debug\net8.0\ProjectManagmentAPI.MvcApplicationPartsAssemblyInfo.cache
+C:\Users\sciiphoz\source\repos\ProjectManagmentAPI\ProjectManagmentAPI\obj\Debug\net8.0\ProjectManagmentAPI.sourcelink.json
