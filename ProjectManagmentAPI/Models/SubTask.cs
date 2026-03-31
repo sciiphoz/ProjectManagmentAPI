@@ -45,8 +45,8 @@ namespace ProjectManagementAPI.Models
 
         [Required]
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-
         public DateTime? UpdatedAt { get; set; }
+        public int? ActualMinutes { get; set; }
 
         // Navigation properties
         [ForeignKey("BacklogItemId")]

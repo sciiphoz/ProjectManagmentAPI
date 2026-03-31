@@ -40,6 +40,13 @@ namespace ProjectManagementAPI.Models
         [Required]
         public bool IsActive { get; set; } = true;
 
+        public string? RefreshToken { get; set; }            
+        public DateTime? RefreshTokenExpiryTime { get; set; } 
+        public string? EmailConfirmationToken { get; set; }   
+        public DateTime? EmailConfirmedAt { get; set; }       
+        public string? PasswordResetToken { get; set; }       
+        public DateTime? PasswordResetTokenExpiry { get; set; }
+
         [InverseProperty("Owner")]
         public virtual ICollection<Project> OwnedProjects { get; set; } = new List<Project>();
 

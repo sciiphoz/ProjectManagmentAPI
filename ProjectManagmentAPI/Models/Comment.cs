@@ -22,7 +22,7 @@ namespace ProjectManagementAPI.Models
         [Column(TypeName = "text")]
         public string Content { get; set; } = string.Empty;
 
-        [Column(TypeName = "jsonb")]
+        [Column(TypeName = "nvarchar(max)")]
         public string? MentionedUsers { get; set; }
 
         [Required]

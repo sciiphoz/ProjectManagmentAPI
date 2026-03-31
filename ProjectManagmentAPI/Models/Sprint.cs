@@ -42,6 +42,14 @@ namespace ProjectManagementAPI.Models
         [Required]
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
+        public int? CommittedStoryPoints { get; set; }      
+        public int? CompletedStoryPoints { get; set; }      
+        public DateTime? CompletedAt { get; set; }          
+        [Column(TypeName = "text")]
+        public string? ReviewNotes { get; set; }            
+        [Column(TypeName = "text")]
+        public string? RetrospectiveNotes { get; set; }
+
         // Navigation properties
         [ForeignKey("ProjectId")]
         public virtual Project Project { get; set; } = null!;

@@ -56,6 +56,10 @@ namespace ProjectManagementAPI.Models
 
         public DateTime? CompletedAt { get; set; }
 
+        public int? SprintPriority { get; set; }             
+        public DateTime? StartedAt { get; set; }             
+        public int? ActualHours { get; set; }
+
         // Navigation properties
         [ForeignKey("ProjectId")]
         public virtual Project Project { get; set; } = null!;

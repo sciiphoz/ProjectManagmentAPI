@@ -28,10 +28,10 @@ namespace ProjectManagementAPI.Models
         [Required]
         public Guid EntityId { get; set; }
 
-        [Column(TypeName = "jsonb")]
+        [Column(TypeName = "nvarchar(max)")]
         public string? OldValue { get; set; }
 
-        [Column(TypeName = "jsonb")]
+        [Column(TypeName = "nvarchar(max)")]
         public string? NewValue { get; set; }
 
         [Required]

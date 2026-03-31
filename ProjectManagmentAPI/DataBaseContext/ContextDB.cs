@@ -22,6 +22,9 @@ namespace ProjectManagementAPI.DataBaseContext
         public DbSet<ActivityLog> ActivityLogs { get; set; }
         public DbSet<DailyUserTask> DailyUserTasks { get; set; }
         public DbSet<SprintVelocity> SprintVelocities { get; set; }
+        public DbSet<Notification> Notifications { get; set; }
+        public DbSet<RetrospectiveItem> RetrospectiveItems { get; set; }
+        public DbSet<RetrospectiveVote> RetrospectiveVotes { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -81,6 +84,40 @@ namespace ProjectManagementAPI.DataBaseContext
                 .WithMany(u => u.ReportedBlockers)
                 .HasForeignKey(b => b.ReportedById)
                 .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<RetrospectiveVote>()
+            .HasIndex(rv => new { rv.RetrospectiveItemId, rv.UserId })
+            .IsUnique();
+
+            modelBuilder.Entity<Notification>()
+                .HasIndex(n => new { n.UserId, n.IsRead, n.CreatedAt });
+
+            modelBuilder.Entity<RetrospectiveItem>()
+                .HasIndex(ri => new { ri.SprintId, ri.Category });
+
+            modelBuilder.Entity<BacklogItem>()
+                .HasIndex(bi => new { bi.AssigneeId, bi.Status, bi.SprintId });
+
+            modelBuilder.Entity<SubTask>()
+                .HasIndex(st => new { st.AssigneeId, st.Status, st.BacklogItemId });
+
+            modelBuilder.Entity<RetrospectiveVote>()
+                .HasOne(rv => rv.User)
+                .WithMany() 
+                .HasForeignKey(rv => rv.UserId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<RetrospectiveVote>()
+                .HasOne(rv => rv.RetrospectiveItem)
+                .WithMany(ri => ri.Votes)
+                .HasForeignKey(rv => rv.RetrospectiveItemId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<Blocker>()
+                .HasOne(b => b.ReportedBy)
+                .WithMany(u => u.ReportedBlockers)
+                .HasForeignKey(b => b.ReportedById)
+                .OnDelete(DeleteBehavior.Restrict); 
         }
     }
 }

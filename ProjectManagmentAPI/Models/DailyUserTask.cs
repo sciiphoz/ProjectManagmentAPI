@@ -19,13 +19,13 @@ namespace ProjectManagementAPI.Models
         [Column(TypeName = "date")]
         public DateTime Date { get; set; }
 
-        [Column(TypeName = "jsonb")]
+        [Column(TypeName = "nvarchar(max)")]
         public string? WorkedYesterday { get; set; }
 
-        [Column(TypeName = "jsonb")]
+        [Column(TypeName = "nvarchar(max)")]
         public string? PlanForToday { get; set; }
 
-        [Column(TypeName = "jsonb")]
+        [Column(TypeName = "nvarchar(max)")]
         public string? Blockers { get; set; }
 
         [Required]
