@@ -8,6 +8,7 @@ namespace ProjectManagementAPI.DataBaseContext
         public ContextDb(DbContextOptions<ContextDb> options)
             : base(options)
         {
+            Database.SetCommandTimeout(120);
         }
 
         public DbSet<User> Users { get; set; }

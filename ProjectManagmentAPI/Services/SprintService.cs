@@ -466,27 +466,59 @@ namespace ProjectManagementAPI.Services
                 return ApiResponse<List<BurndownPoint>>.Fail("Спринт не найден");
             }
 
+            var burndownPoints = new List<BurndownPoint>();
+
+            // Рассчитываем общее количество часов
             var totalHours = sprint.BacklogItems
                 .Sum(bi => bi.EstimatedHours ?? 0) +
                 sprint.BacklogItems
                     .SelectMany(bi => bi.SubTasks)
                     .Sum(st => st.EstimatedHours ?? 0);
 
-            var days = (sprint.EndDate - sprint.StartDate).Days;
-            var dailyIdealBurn = days > 0 ? totalHours / days : 0;
-
-            var burndownPoints = new List<BurndownPoint>();
-            var currentDate = sprint.StartDate;
-
-            while (currentDate <= sprint.EndDate)
+            // Если нет задач с оценкой времени, возвращаем пустой список
+            if (totalHours == 0)
             {
-                var remainingHours = totalHours - dailyIdealBurn * (currentDate - sprint.StartDate).Days;
+                return ApiResponse<List<BurndownPoint>>.Ok(new List<BurndownPoint>(), "Нет данных для графика");
+            }
+
+            var days = (sprint.EndDate - sprint.StartDate).Days;
+            if (days <= 0) days = 1;
+
+            var dailyIdealBurn = totalHours / days;
+
+            // Создаем словарь выполненных часов по дням
+            var completedHoursPerDay = new Dictionary<DateTime, decimal>();
+
+            foreach (var task in sprint.BacklogItems.Where(bi => bi.Status == BacklogItemStatus.Done && bi.CompletedAt.HasValue))
+            {
+                var completedDate = task.CompletedAt!.Value.Date;
+                var taskHours = (task.EstimatedHours ?? 0) + task.SubTasks.Sum(st => st.EstimatedHours ?? 0);
+
+                if (!completedHoursPerDay.ContainsKey(completedDate))
+                    completedHoursPerDay[completedDate] = 0;
+
+                completedHoursPerDay[completedDate] += taskHours;
+            }
+
+            var remaining = totalHours;
+            var currentDate = sprint.StartDate.Date;
+
+            while (currentDate <= sprint.EndDate.Date)
+            {
+                // Вычитаем выполненные в этот день часы
+                if (completedHoursPerDay.ContainsKey(currentDate))
+                {
+                    remaining -= completedHoursPerDay[currentDate];
+                }
+
+                var idealRemaining = Math.Max(0, totalHours - dailyIdealBurn * (currentDate - sprint.StartDate.Date).Days);
+                var actualRemaining = Math.Max(0, remaining);
 
                 burndownPoints.Add(new BurndownPoint
                 {
                     Date = currentDate,
-                    RemainingHours = Math.Max(0, remainingHours),
-                    IdealRemainingHours = Math.Max(0, totalHours - dailyIdealBurn * (currentDate - sprint.StartDate).Days),
+                    RemainingHours = actualRemaining,
+                    IdealRemainingHours = idealRemaining,
                     RemainingStoryPoints = 0
                 });
 

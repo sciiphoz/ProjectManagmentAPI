@@ -26,8 +26,13 @@ namespace ProjectManagementAPI.Controllers
         [HttpPost]
         public async Task<ActionResult<ApiResponse<BacklogItemResponse>>> CreateBacklogItem(CreateBacklogItemRequest request)
         {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ApiResponse<BacklogItemResponse>.Fail("Неверные данные"));
+            }
+
             var response = await _backlogService.CreateBacklogItemAsync(request);
-            return CreatedAtAction(nameof(GetBacklogItemById), new { id = response.Data?.Id }, response);
+            return Ok(response);
         }
 
         /// <summary>
@@ -46,8 +51,15 @@ namespace ProjectManagementAPI.Controllers
         [HttpGet("{id}/detail")]
         public async Task<ActionResult<ApiResponse<BacklogItemDetailResponse>>> GetBacklogItemDetail(Guid id)
         {
-            var response = await _backlogService.GetBacklogItemDetailAsync(id);
-            return Ok(response);
+            try
+            {
+                var response = await _backlogService.GetBacklogItemDetailAsync(id);
+                return Ok(response);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, ApiResponse<BacklogItemDetailResponse>.Fail($"Внутренняя ошибка: {ex.Message}"));
+            }
         }
 
         /// <summary>

@@ -34,7 +34,16 @@ builder.Services.AddAuthorization();
 
 // Database Context
 builder.Services.AddDbContext<ContextDb>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("DBConnection")), ServiceLifetime.Scoped);
+{
+    options.UseSqlServer(builder.Configuration.GetConnectionString("DBConnection"), sqlOptions =>
+    {
+        sqlOptions.EnableRetryOnFailure(
+            maxRetryCount: 5,
+            maxRetryDelay: TimeSpan.FromSeconds(30),
+            errorNumbersToAdd: null);
+        sqlOptions.CommandTimeout(120);
+    });
+}, ServiceLifetime.Scoped);
 
 // Register Services
 builder.Services.AddScoped<IUserService, UserService>();

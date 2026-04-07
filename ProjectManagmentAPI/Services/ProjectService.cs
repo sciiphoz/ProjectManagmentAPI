@@ -393,12 +393,18 @@ namespace ProjectManagementAPI.Services
                 Id = project.Id,
                 Name = project.Name,
                 Description = project.Description,
-                Owner = new UserBriefResponse
+                Owner = project.Owner != null ? new UserBriefResponse
                 {
                     Id = project.Owner.Id,
                     FullName = project.Owner.FullName,
                     Username = project.Owner.Username,
                     Email = project.Owner.Email
+                } : new UserBriefResponse
+                {
+                    Id = Guid.Empty,
+                    FullName = "Неизвестный",
+                    Username = "unknown",
+                    Email = ""
                 },
                 CreatedAt = project.CreatedAt,
                 UpdatedAt = project.UpdatedAt,
