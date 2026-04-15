@@ -1,294 +1,353 @@
 ﻿using Microsoft.EntityFrameworkCore;
-using ProjectManagementAPI.Models;
-using ProjectManagementAPI.DTO.Common;
-using ProjectManagementAPI.DTO.Responses;
-using ProjectManagementAPI.Interfaces;
 using ProjectManagementAPI.DataBaseContext;
+using ProjectManagementAPI.DTO.Common;
+using ProjectManagementAPI.DTO.Requests;
+using ProjectManagementAPI.DTO.Responses;
+using ProjectManagementAPI.Enums;
+using ProjectManagementAPI.Interfaces;
+using ProjectManagementAPI.Models;
 using System;
 using System.Text.Json;
-using ProjectManagementAPI.DTO.Requests;
-using ProjectManagementAPI.Enums;
 
 namespace ProjectManagementAPI.Services
 {
-    public class DashboardService : IDashboardService
+    public class DashboardService : BaseService, IDashboardService
     {
         private readonly ContextDb _context;
 
-        public DashboardService(ContextDb context)
+        public DashboardService(ContextDb context, ILogger<DashboardService> logger) : base(logger)
         {
             _context = context;
         }
 
         public async Task<ApiResponse<PersonalDashboardResponse>> GetPersonalDashboardAsync(Guid userId, DashboardRequest? request = null)
         {
-            var date = request?.Date ?? DateTime.UtcNow.Date;
-
-            // Получаем задачи, назначенные пользователю
-            var assignedTasks = await _context.BacklogItems
-                .Include(bi => bi.Project)
-                .Where(bi => bi.AssigneeId == userId && bi.SprintId != null)
-                .ToListAsync();
-
-            // Задачи, над которыми работал вчера (были в статусе InProgress)
-            var workedYesterday = assignedTasks
-                .Where(t => t.Status == BacklogItemStatus.InProgress &&
-                            t.UpdatedAt.HasValue &&
-                            t.UpdatedAt.Value.Date == date.AddDays(-1))
-                .Select(t => new DailyTaskDetail
-                {
-                    Id = t.Id,
-                    Title = t.Title,
-                    ProjectName = t.Project.Name,
-                    ProjectId = t.ProjectId,
-                    Status = t.Status.ToString(),
-                    Type = t.Type.ToString(),
-                    StoryPoints = t.StoryPoints,
-                    EstimatedHours = t.EstimatedHours,
-                    DueDate = t.Sprint?.EndDate,
-                    SubTasksTotal = t.SubTasks.Count,
-                    SubTasksCompleted = t.SubTasks.Count(st => st.Status == SubTaskStatus.Done)
-                })
-                .ToList();
-
-            // Задачи на сегодня (To Do и In Progress)
-            var planForToday = assignedTasks
-                .Where(t => t.Status == BacklogItemStatus.ToDo || t.Status == BacklogItemStatus.InProgress)
-                .Select(t => new DailyTaskDetail
-                {
-                    Id = t.Id,
-                    Title = t.Title,
-                    ProjectName = t.Project.Name,
-                    ProjectId = t.ProjectId,
-                    Status = t.Status.ToString(),
-                    Type = t.Type.ToString(),
-                    StoryPoints = t.StoryPoints,
-                    EstimatedHours = t.EstimatedHours,
-                    DueDate = t.Sprint?.EndDate,
-                    SubTasksTotal = t.SubTasks.Count,
-                    SubTasksCompleted = t.SubTasks.Count(st => st.Status == SubTaskStatus.Done)
-                })
-                .ToList();
-
-            // Активные блокеры
-            var blockers = await _context.Blockers
-                .Where(b => b.BacklogItem!.AssigneeId == userId && b.Status == BlockerStatus.Active)
-                .Select(b => new BlockerResponse
-                {
-                    Id = b.Id,
-                    Description = b.Description,
-                    Severity = b.Severity.ToString(),
-                    Status = b.Status.ToString(),
-                    CreatedAt = b.CreatedAt
-                })
-                .ToListAsync();
-
-            // Получаем сохраненные ежедневные задачи из DailyUserTasks
-            var dailyTask = await _context.DailyUserTasks
-                .FirstOrDefaultAsync(d => d.UserId == userId && d.Date == date);
-
-            if (dailyTask != null)
+            try
             {
-                if (!string.IsNullOrEmpty(dailyTask.WorkedYesterday))
-                {
-                    var savedWorkedYesterday = JsonSerializer.Deserialize<List<DailyTaskDetail>>(dailyTask.WorkedYesterday);
-                    if (savedWorkedYesterday != null && savedWorkedYesterday.Any())
+                var date = request?.Date ?? DateTime.UtcNow.Date;
+
+                var assignedTasks = await _context.BacklogItems
+                    .Include(bi => bi.Project)
+                    .Include(bi => bi.SubTasks)
+                    .Include(bi => bi.Sprint)
+                    .Where(bi => bi.AssigneeId == userId && bi.SprintId != null)
+                    .ToListAsync();
+
+                var workedYesterday = assignedTasks
+                    .Where(t => t.Status == BacklogItemStatus.InProgress &&
+                                t.UpdatedAt.HasValue &&
+                                t.UpdatedAt.Value.Date == date.AddDays(-1))
+                    .Select(t => new DailyTaskDetail
                     {
-                        workedYesterday = savedWorkedYesterday;
-                    }
-                }
+                        Id = t.Id,
+                        Title = t.Title,
+                        ProjectName = t.Project.Name,
+                        ProjectId = t.ProjectId,
+                        Status = t.Status.ToString(),
+                        Type = t.Type.ToString(),
+                        StoryPoints = t.StoryPoints,
+                        EstimatedHours = t.EstimatedHours,
+                        DueDate = t.Sprint?.EndDate,
+                        SubTasksTotal = t.SubTasks.Count,
+                        SubTasksCompleted = t.SubTasks.Count(st => st.Status == SubTaskStatus.Done)
+                    })
+                    .ToList();
 
-                if (!string.IsNullOrEmpty(dailyTask.PlanForToday))
-                {
-                    var savedPlanForToday = JsonSerializer.Deserialize<List<DailyTaskDetail>>(dailyTask.PlanForToday);
-                    if (savedPlanForToday != null && savedPlanForToday.Any())
+                var planForToday = assignedTasks
+                    .Where(t => t.Status == BacklogItemStatus.ToDo || t.Status == BacklogItemStatus.InProgress)
+                    .Select(t => new DailyTaskDetail
                     {
-                        planForToday = savedPlanForToday;
-                    }
-                }
+                        Id = t.Id,
+                        Title = t.Title,
+                        ProjectName = t.Project.Name,
+                        ProjectId = t.ProjectId,
+                        Status = t.Status.ToString(),
+                        Type = t.Type.ToString(),
+                        StoryPoints = t.StoryPoints,
+                        EstimatedHours = t.EstimatedHours,
+                        DueDate = t.Sprint?.EndDate,
+                        SubTasksTotal = t.SubTasks.Count,
+                        SubTasksCompleted = t.SubTasks.Count(st => st.Status == SubTaskStatus.Done)
+                    })
+                    .ToList();
 
-                if (!string.IsNullOrEmpty(dailyTask.Blockers))
-                {
-                    var savedBlockers = JsonSerializer.Deserialize<List<BlockerResponse>>(dailyTask.Blockers);
-                    if (savedBlockers != null && savedBlockers.Any())
+                var blockers = await _context.Blockers
+                    .Where(b => b.BacklogItem!.AssigneeId == userId && b.Status == BlockerStatus.Active)
+                    .Select(b => new BlockerResponse
                     {
-                        blockers = savedBlockers;
-                    }
-                }
-            }
+                        Id = b.Id,
+                        Description = b.Description,
+                        Severity = b.Severity.ToString(),
+                        Status = b.Status.ToString(),
+                        CreatedAt = b.CreatedAt
+                    })
+                    .ToListAsync();
 
-            var overdueTasks = assignedTasks
-                .Count(t => t.Status != BacklogItemStatus.Done &&
-                            t.Sprint != null &&
-                            t.Sprint.EndDate < DateTime.UtcNow.Date);
-
-            var response = new PersonalDashboardResponse
-            {
-                Date = date,
-                WorkedYesterday = workedYesterday,
-                PlanForToday = planForToday,
-                ActiveBlockers = blockers,
-                TotalTasksAssigned = assignedTasks.Count,
-                TasksInProgress = assignedTasks.Count(t => t.Status == BacklogItemStatus.InProgress),
-                TasksCompletedToday = assignedTasks.Count(t => t.CompletedAt.HasValue && t.CompletedAt.Value.Date == date),
-                OverdueTasks = overdueTasks,
-                Notifications = new List<NotificationResponse>()
-            };
-
-            return ApiResponse<PersonalDashboardResponse>.Ok(response);
-        }
-
-        public async Task<ApiResponse<DailyScrumResponse>> GetDailyScrumViewAsync(Guid projectId, Guid? sprintId = null)
-        {
-            var project = await _context.Projects.FindAsync(projectId);
-            if (project == null)
-            {
-                return ApiResponse<DailyScrumResponse>.Fail("Проект не найден");
-            }
-
-            // Получаем всех участников проекта
-            var members = await _context.ProjectMembers
-                .Where(pm => pm.ProjectId == projectId)
-                .Include(pm => pm.User)
-                .ToListAsync();
-
-            var sprint = sprintId.HasValue
-                ? await _context.Sprints.FindAsync(sprintId.Value)
-                : await _context.Sprints
-                    .FirstOrDefaultAsync(s => s.ProjectId == projectId && s.IsActive);
-
-            var teamMembers = new List<TeamMemberDailyStatus>();
-
-            foreach (var member in members)
-            {
-                // Получаем ежедневные задачи участника
                 var dailyTask = await _context.DailyUserTasks
-                    .FirstOrDefaultAsync(d => d.UserId == member.UserId && d.Date == DateTime.UtcNow.Date);
-
-                var workedYesterday = new List<DailyTaskDetail>();
-                var planForToday = new List<DailyTaskDetail>();
-                var blockers = new List<BlockerResponse>();
+                    .FirstOrDefaultAsync(d => d.UserId == userId && d.Date == date);
 
                 if (dailyTask != null)
                 {
                     if (!string.IsNullOrEmpty(dailyTask.WorkedYesterday))
                     {
-                        workedYesterday = JsonSerializer.Deserialize<List<DailyTaskDetail>>(dailyTask.WorkedYesterday) ?? new();
+                        try
+                        {
+                            var savedWorkedYesterday = JsonSerializer.Deserialize<List<DailyTaskDetail>>(dailyTask.WorkedYesterday);
+                            if (savedWorkedYesterday != null && savedWorkedYesterday.Any())
+                            {
+                                workedYesterday = savedWorkedYesterday;
+                            }
+                        }
+                        catch (JsonException ex)
+                        {
+                            _logger.LogError(ex, "Ошибка десериализации WorkedYesterday");
+                        }
                     }
 
                     if (!string.IsNullOrEmpty(dailyTask.PlanForToday))
                     {
-                        planForToday = JsonSerializer.Deserialize<List<DailyTaskDetail>>(dailyTask.PlanForToday) ?? new();
+                        try
+                        {
+                            var savedPlanForToday = JsonSerializer.Deserialize<List<DailyTaskDetail>>(dailyTask.PlanForToday);
+                            if (savedPlanForToday != null && savedPlanForToday.Any())
+                            {
+                                planForToday = savedPlanForToday;
+                            }
+                        }
+                        catch (JsonException ex)
+                        {
+                            _logger.LogError(ex, "Ошибка десериализации PlanForToday");
+                        }
                     }
 
                     if (!string.IsNullOrEmpty(dailyTask.Blockers))
                     {
-                        blockers = JsonSerializer.Deserialize<List<BlockerResponse>>(dailyTask.Blockers) ?? new();
+                        try
+                        {
+                            var savedBlockers = JsonSerializer.Deserialize<List<BlockerResponse>>(dailyTask.Blockers);
+                            if (savedBlockers != null && savedBlockers.Any())
+                            {
+                                blockers = savedBlockers;
+                            }
+                        }
+                        catch (JsonException ex)
+                        {
+                            _logger.LogError(ex, "Ошибка десериализации Blockers");
+                        }
                     }
                 }
 
-                teamMembers.Add(new TeamMemberDailyStatus
+                var overdueTasks = assignedTasks
+                    .Count(t => t.Status != BacklogItemStatus.Done &&
+                                t.Sprint != null &&
+                                t.Sprint.EndDate < DateTime.UtcNow.Date);
+
+                var response = new PersonalDashboardResponse
                 {
-                    User = new UserBriefResponse
-                    {
-                        Id = member.User.Id,
-                        FullName = member.User.FullName,
-                        Username = member.User.Username,
-                        Email = member.User.Email,
-                        Role = member.RoleInProject.ToString()
-                    },
+                    Date = date,
                     WorkedYesterday = workedYesterday,
                     PlanForToday = planForToday,
-                    Blockers = blockers,
-                    IsAvailable = true,
-                    StatusNote = null
-                });
-            }
+                    ActiveBlockers = blockers,
+                    TotalTasksAssigned = assignedTasks.Count,
+                    TasksInProgress = assignedTasks.Count(t => t.Status == BacklogItemStatus.InProgress),
+                    TasksCompletedToday = assignedTasks.Count(t => t.CompletedAt.HasValue && t.CompletedAt.Value.Date == date),
+                    OverdueTasks = overdueTasks,
+                    Notifications = new List<NotificationResponse>()
+                };
 
-            // Прогресс спринта
-            SprintProgressResponse? sprintProgress = null;
-            if (sprint != null)
+                return ApiResponse<PersonalDashboardResponse>.Ok(response);
+            }
+            catch (Exception ex)
             {
-                var sprintTasks = await _context.BacklogItems
-                    .Where(bi => bi.SprintId == sprint.Id)
+                _logger.LogError(ex, "Ошибка получения персонального дашборда пользователя {UserId}", userId);
+                return ApiResponse<PersonalDashboardResponse>.Fail("Произошла ошибка при загрузке дашборда");
+            }
+        }
+
+        public async Task<ApiResponse<DailyScrumResponse>> GetDailyScrumViewAsync(Guid projectId, Guid? sprintId = null)
+        {
+            try
+            {
+                var project = await _context.Projects.FindAsync(projectId);
+                if (project == null)
+                {
+                    return ApiResponse<DailyScrumResponse>.Fail("Проект не найден");
+                }
+
+                var members = await _context.ProjectMembers
+                    .Where(pm => pm.ProjectId == projectId)
+                    .Include(pm => pm.User)
                     .ToListAsync();
 
-                sprintProgress = new SprintProgressResponse
+                var sprint = sprintId.HasValue
+                    ? await _context.Sprints.FindAsync(sprintId.Value)
+                    : await _context.Sprints
+                        .FirstOrDefaultAsync(s => s.ProjectId == projectId && s.IsActive);
+
+                var teamMembers = new List<TeamMemberDailyStatus>();
+
+                foreach (var member in members)
                 {
-                    SprintId = sprint.Id,
-                    SprintName = sprint.Name,
-                    StartDate = sprint.StartDate,
-                    EndDate = sprint.EndDate,
-                    DaysRemaining = (sprint.EndDate - DateTime.UtcNow.Date).Days,
-                    TotalTasks = sprintTasks.Count,
-                    CompletedTasks = sprintTasks.Count(t => t.Status == BacklogItemStatus.Done),
-                    InProgressTasks = sprintTasks.Count(t => t.Status == BacklogItemStatus.InProgress),
-                    TodoTasks = sprintTasks.Count(t => t.Status == BacklogItemStatus.ToDo),
-                    CompletionPercentage = (decimal)(sprintTasks.Any()
-                        ? (double)sprintTasks.Count(t => t.Status == BacklogItemStatus.Done) / sprintTasks.Count * 100
-                        : 0)
+                    var dailyTask = await _context.DailyUserTasks
+                        .FirstOrDefaultAsync(d => d.UserId == member.UserId && d.Date == DateTime.UtcNow.Date);
+
+                    var workedYesterday = new List<DailyTaskDetail>();
+                    var planForToday = new List<DailyTaskDetail>();
+                    var blockers = new List<BlockerResponse>();
+
+                    if (dailyTask != null)
+                    {
+                        if (!string.IsNullOrEmpty(dailyTask.WorkedYesterday))
+                        {
+                            try
+                            {
+                                workedYesterday = JsonSerializer.Deserialize<List<DailyTaskDetail>>(dailyTask.WorkedYesterday) ?? new();
+                            }
+                            catch (JsonException ex)
+                            {
+                                _logger.LogError(ex, "Ошибка десериализации WorkedYesterday для пользователя {UserId}", member.UserId);
+                            }
+                        }
+
+                        if (!string.IsNullOrEmpty(dailyTask.PlanForToday))
+                        {
+                            try
+                            {
+                                planForToday = JsonSerializer.Deserialize<List<DailyTaskDetail>>(dailyTask.PlanForToday) ?? new();
+                            }
+                            catch (JsonException ex)
+                            {
+                                _logger.LogError(ex, "Ошибка десериализации PlanForToday для пользователя {UserId}", member.UserId);
+                            }
+                        }
+
+                        if (!string.IsNullOrEmpty(dailyTask.Blockers))
+                        {
+                            try
+                            {
+                                blockers = JsonSerializer.Deserialize<List<BlockerResponse>>(dailyTask.Blockers) ?? new();
+                            }
+                            catch (JsonException ex)
+                            {
+                                _logger.LogError(ex, "Ошибка десериализации Blockers для пользователя {UserId}", member.UserId);
+                            }
+                        }
+                    }
+
+                    teamMembers.Add(new TeamMemberDailyStatus
+                    {
+                        User = new UserBriefResponse
+                        {
+                            Id = member.User.Id,
+                            FullName = member.User.FullName,
+                            Username = member.User.Username,
+                            Email = member.User.Email,
+                            Role = member.RoleInProject.ToString()
+                        },
+                        WorkedYesterday = workedYesterday,
+                        PlanForToday = planForToday,
+                        Blockers = blockers,
+                        IsAvailable = true,
+                        StatusNote = null
+                    });
+                }
+
+                SprintProgressResponse? sprintProgress = null;
+                if (sprint != null)
+                {
+                    var sprintTasks = await _context.BacklogItems
+                        .Where(bi => bi.SprintId == sprint.Id)
+                        .ToListAsync();
+
+                    sprintProgress = new SprintProgressResponse
+                    {
+                        SprintId = sprint.Id,
+                        SprintName = sprint.Name,
+                        StartDate = sprint.StartDate,
+                        EndDate = sprint.EndDate,
+                        DaysRemaining = (sprint.EndDate - DateTime.UtcNow.Date).Days,
+                        TotalTasks = sprintTasks.Count,
+                        CompletedTasks = sprintTasks.Count(t => t.Status == BacklogItemStatus.Done),
+                        InProgressTasks = sprintTasks.Count(t => t.Status == BacklogItemStatus.InProgress),
+                        TodoTasks = sprintTasks.Count(t => t.Status == BacklogItemStatus.ToDo),
+                        CompletionPercentage = sprintTasks.Any()
+                            ? sprintTasks.Count(t => t.Status == BacklogItemStatus.Done) / sprintTasks.Count * 100
+                            : 0
+                    };
+                }
+
+                var teamBlockers = await _context.Blockers
+                    .Where(b => b.BacklogItem!.ProjectId == projectId && b.Status == BlockerStatus.Active)
+                    .Select(b => new BlockerResponse
+                    {
+                        Id = b.Id,
+                        Description = b.Description,
+                        Severity = b.Severity.ToString(),
+                        Status = b.Status.ToString(),
+                        CreatedAt = b.CreatedAt
+                    })
+                    .ToListAsync();
+
+                var response = new DailyScrumResponse
+                {
+                    Date = DateTime.UtcNow.Date,
+                    TeamMembers = teamMembers,
+                    TeamBlockers = teamBlockers,
+                    SprintProgress = sprintProgress ?? new SprintProgressResponse()
                 };
+
+                return ApiResponse<DailyScrumResponse>.Ok(response);
             }
-
-            // Командные блокеры
-            var teamBlockers = await _context.Blockers
-                .Where(b => b.BacklogItem!.ProjectId == projectId && b.Status == BlockerStatus.Active)
-                .Select(b => new BlockerResponse
-                {
-                    Id = b.Id,
-                    Description = b.Description,
-                    Severity = b.Severity.ToString(),
-                    Status = b.Status.ToString(),
-                    CreatedAt = b.CreatedAt
-                })
-                .ToListAsync();
-
-            var response = new DailyScrumResponse
+            catch (Exception ex)
             {
-                Date = DateTime.UtcNow.Date,
-                TeamMembers = teamMembers,
-                TeamBlockers = teamBlockers,
-                SprintProgress = sprintProgress ?? new SprintProgressResponse()
-            };
-
-            return ApiResponse<DailyScrumResponse>.Ok(response);
+                _logger.LogError(ex, "Ошибка получения Daily Scrum для проекта {ProjectId}", projectId);
+                return ApiResponse<DailyScrumResponse>.Fail("Произошла ошибка при загрузке данных");
+            }
         }
 
         public async Task<ApiResponse> UpdateDailyTasksAsync(Guid userId, UpdateDailyTasksRequest request)
         {
-            var dailyTask = await _context.DailyUserTasks
-                .FirstOrDefaultAsync(d => d.UserId == userId && d.Date == request.Date);
-
-            var workedYesterdayJson = JsonSerializer.Serialize(request.WorkedYesterday);
-            var planForTodayJson = JsonSerializer.Serialize(request.PlanForToday);
-            var blockersJson = JsonSerializer.Serialize(request.Blockers);
-
-            if (dailyTask == null)
+            try
             {
-                dailyTask = new DailyUserTask
+                var dailyTask = await _context.DailyUserTasks
+                    .FirstOrDefaultAsync(d => d.UserId == userId && d.Date == request.Date);
+
+                var workedYesterdayJson = JsonSerializer.Serialize(request.WorkedYesterday);
+                var planForTodayJson = JsonSerializer.Serialize(request.PlanForToday);
+                var blockersJson = JsonSerializer.Serialize(request.Blockers);
+
+                if (dailyTask == null)
                 {
-                    Id = Guid.NewGuid(),
-                    UserId = userId,
-                    Date = request.Date,
-                    WorkedYesterday = workedYesterdayJson,
-                    PlanForToday = planForTodayJson,
-                    Blockers = blockersJson,
-                    CreatedAt = DateTime.UtcNow
-                };
+                    dailyTask = new DailyUserTask
+                    {
+                        Id = Guid.NewGuid(),
+                        UserId = userId,
+                        Date = request.Date,
+                        WorkedYesterday = workedYesterdayJson,
+                        PlanForToday = planForTodayJson,
+                        Blockers = blockersJson,
+                        CreatedAt = DateTime.UtcNow
+                    };
 
-                _context.DailyUserTasks.Add(dailyTask);
+                    _context.DailyUserTasks.Add(dailyTask);
+                }
+                else
+                {
+                    dailyTask.WorkedYesterday = workedYesterdayJson;
+                    dailyTask.PlanForToday = planForTodayJson;
+                    dailyTask.Blockers = blockersJson;
+                    dailyTask.UpdatedAt = DateTime.UtcNow;
+                }
+
+                await _context.SaveChangesAsync();
+
+                return ApiResponse.Ok("Ежедневные задачи обновлены");
             }
-            else
+            catch (Exception ex)
             {
-                dailyTask.WorkedYesterday = workedYesterdayJson;
-                dailyTask.PlanForToday = planForTodayJson;
-                dailyTask.Blockers = blockersJson;
-                dailyTask.UpdatedAt = DateTime.UtcNow;
+                _logger.LogError(ex, "Ошибка обновления ежедневных задач пользователя {UserId}", userId);
+                return ApiResponse.Fail("Произошла ошибка при сохранении данных");
             }
-
-            await _context.SaveChangesAsync();
-
-            return ApiResponse.Ok("Ежедневные задачи обновлены");
         }
     }
 }

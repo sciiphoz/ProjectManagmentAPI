@@ -1,5 +1,4 @@
-﻿// Controllers/AuthController.cs
-using Microsoft.AspNetCore.Authorization;
+﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using ProjectManagementAPI.DTO.Common;
 using ProjectManagementAPI.DTO.Requests;
@@ -14,95 +13,136 @@ namespace ProjectManagementAPI.Controllers
     public class AuthController : ControllerBase
     {
         private readonly IUserService _userService;
+        private readonly ILogger<AuthController> _logger;
 
-        public AuthController(IUserService userService)
+        public AuthController(IUserService userService, ILogger<AuthController> logger)
         {
             _userService = userService;
+            _logger = logger;
         }
 
-        /// <summary>
-        /// Регистрация нового пользователя
-        /// </summary>
         [HttpPost("register")]
         [AllowAnonymous]
         public async Task<ActionResult<ApiResponse<AuthResponse>>> Register(RegisterRequest request)
         {
-            if (!ModelState.IsValid)
-                return BadRequest(ApiResponse<AuthResponse>.Fail("Неверные данные",
-                    ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage).ToList()));
+            try
+            {
+                if (!ModelState.IsValid)
+                {
+                    return BadRequest(ApiResponse<AuthResponse>.Fail("Неверные данные",
+                        ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage).ToList()));
+                }
 
-            var response = await _userService.RegisterAsync(request);
-            return response.Success ? Ok(response) : BadRequest(response);
+                var response = await _userService.RegisterAsync(request);
+                return response.Success ? Ok(response) : BadRequest(response);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Ошибка при регистрации пользователя");
+                return StatusCode(500, ApiResponse<AuthResponse>.Fail("Внутренняя ошибка сервера"));
+            }
         }
 
-        /// <summary>
-        /// Вход в систему
-        /// </summary>
         [HttpPost("login")]
         [AllowAnonymous]
         public async Task<ActionResult<ApiResponse<AuthResponse>>> Login(LoginRequest request)
         {
-            if (!ModelState.IsValid)
-                return BadRequest(ApiResponse<AuthResponse>.Fail("Неверные данные"));
+            try
+            {
+                if (!ModelState.IsValid)
+                {
+                    return BadRequest(ApiResponse<AuthResponse>.Fail("Неверные данные"));
+                }
 
-            var response = await _userService.LoginAsync(request);
-            return response.Success ? Ok(response) : Unauthorized(response);
+                var response = await _userService.LoginAsync(request);
+                return response.Success ? Ok(response) : Unauthorized(response);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Ошибка при входе пользователя");
+                return StatusCode(500, ApiResponse<AuthResponse>.Fail("Внутренняя ошибка сервера"));
+            }
         }
 
-        /// <summary>
-        /// Выход из системы
-        /// </summary>
         [HttpPost("logout")]
         [Authorize]
         public async Task<ActionResult<ApiResponse>> Logout()
         {
-            var userId = User.GetUserId();
-            var response = await _userService.LogoutAsync(userId);
-            return Ok(response);
+            try
+            {
+                var userId = User.GetUserId();
+                var response = await _userService.LogoutAsync(userId);
+                return Ok(response);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Ошибка при выходе пользователя");
+                return StatusCode(500, ApiResponse.Fail("Внутренняя ошибка сервера"));
+            }
         }
 
-        /// <summary>
-        /// Обновление токена доступа
-        /// </summary>
         [HttpPost("refresh-token")]
         [AllowAnonymous]
         public async Task<ActionResult<ApiResponse<AuthResponse>>> RefreshToken(RefreshTokenRequest request)
         {
-            var response = await _userService.RefreshTokenAsync(request.RefreshToken);
-            return response.Success ? Ok(response) : Unauthorized(response);
+            try
+            {
+                var response = await _userService.RefreshTokenAsync(request.RefreshToken);
+                return response.Success ? Ok(response) : Unauthorized(response);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Ошибка при обновлении токена");
+                return StatusCode(500, ApiResponse<AuthResponse>.Fail("Внутренняя ошибка сервера"));
+            }
         }
 
-        /// <summary>
-        /// Подтверждение email
-        /// </summary>
         [HttpPost("confirm-email")]
         [AllowAnonymous]
         public async Task<ActionResult<ApiResponse>> ConfirmEmail(ConfirmEmailRequest request)
         {
-            var response = await _userService.ConfirmEmailAsync(request.Token, request.Email);
-            return response.Success ? Ok(response) : BadRequest(response);
+            try
+            {
+                var response = await _userService.ConfirmEmailAsync(request.Token, request.Email);
+                return response.Success ? Ok(response) : BadRequest(response);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Ошибка при подтверждении email");
+                return StatusCode(500, ApiResponse.Fail("Внутренняя ошибка сервера"));
+            }
         }
 
-        /// <summary>
-        /// Запрос на сброс пароля
-        /// </summary>
         [HttpPost("forgot-password")]
         [AllowAnonymous]
         public async Task<ActionResult<ApiResponse>> ForgotPassword(ForgotPasswordRequest request)
         {
-            var response = await _userService.ForgotPasswordAsync(request.Email);
-            return Ok(response);
+            try
+            {
+                var response = await _userService.ForgotPasswordAsync(request.Email);
+                return Ok(response);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Ошибка при запросе сброса пароля");
+                return StatusCode(500, ApiResponse.Fail("Внутренняя ошибка сервера"));
+            }
         }
 
-        /// <summary>
-        /// Сброс пароля
-        /// </summary>
         [HttpPost("reset-password")]
         [AllowAnonymous]
         public async Task<ActionResult<ApiResponse>> ResetPassword(ResetPasswordRequest request)
         {
-            var response = await _userService.ResetPasswordAsync(request);
-            return response.Success ? Ok(response) : BadRequest(response);
+            try
+            {
+                var response = await _userService.ResetPasswordAsync(request);
+                return response.Success ? Ok(response) : BadRequest(response);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Ошибка при сбросе пароля");
+                return StatusCode(500, ApiResponse.Fail("Внутренняя ошибка сервера"));
+            }
         }
     }
 }

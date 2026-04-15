@@ -3,40 +3,36 @@
   "WorkspaceRootPath": "C:\\Users\\sciiphoz\\source\\repos\\ProjectManagementAPI\\",
   "Documents": [
     {
+      "AbsoluteMoniker": "D:0:0:{286FDA71-084C-4F46-B794-2BB92B5DD47F}|ProjectManagmentAPI\\ProjectManagementAPI.csproj|c:\\users\\sciiphoz\\source\\repos\\projectmanagementapi\\projectmanagmentapi\\services\\dashboardservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{286FDA71-084C-4F46-B794-2BB92B5DD47F}|ProjectManagmentAPI\\ProjectManagementAPI.csproj|solutionrelative:projectmanagmentapi\\services\\dashboardservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{286FDA71-084C-4F46-B794-2BB92B5DD47F}|ProjectManagmentAPI\\ProjectManagementAPI.csproj|c:\\users\\sciiphoz\\source\\repos\\projectmanagementapi\\projectmanagmentapi\\services\\subtaskservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{286FDA71-084C-4F46-B794-2BB92B5DD47F}|ProjectManagmentAPI\\ProjectManagementAPI.csproj|solutionrelative:projectmanagmentapi\\services\\subtaskservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
       "AbsoluteMoniker": "D:0:0:{286FDA71-084C-4F46-B794-2BB92B5DD47F}|ProjectManagmentAPI\\ProjectManagementAPI.csproj|c:\\users\\sciiphoz\\source\\repos\\projectmanagementapi\\projectmanagmentapi\\services\\sprintservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
       "RelativeMoniker": "D:0:0:{286FDA71-084C-4F46-B794-2BB92B5DD47F}|ProjectManagmentAPI\\ProjectManagementAPI.csproj|solutionrelative:projectmanagmentapi\\services\\sprintservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{286FDA71-084C-4F46-B794-2BB92B5DD47F}|ProjectManagmentAPI\\ProjectManagementAPI.csproj|c:\\users\\sciiphoz\\source\\repos\\projectmanagementapi\\projectmanagmentapi\\databasecontext\\contextdb.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{286FDA71-084C-4F46-B794-2BB92B5DD47F}|ProjectManagmentAPI\\ProjectManagementAPI.csproj|solutionrelative:projectmanagmentapi\\databasecontext\\contextdb.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{286FDA71-084C-4F46-B794-2BB92B5DD47F}|ProjectManagmentAPI\\ProjectManagementAPI.csproj|c:\\users\\sciiphoz\\source\\repos\\projectmanagementapi\\projectmanagmentapi\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{286FDA71-084C-4F46-B794-2BB92B5DD47F}|ProjectManagmentAPI\\ProjectManagementAPI.csproj|solutionrelative:projectmanagmentapi\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{286FDA71-084C-4F46-B794-2BB92B5DD47F}|ProjectManagmentAPI\\ProjectManagementAPI.csproj|c:\\users\\sciiphoz\\source\\repos\\projectmanagementapi\\projectmanagmentapi\\appsettings.json||{90A6B3A7-C1A3-4009-A288-E2FF89E96FA0}",
-      "RelativeMoniker": "D:0:0:{286FDA71-084C-4F46-B794-2BB92B5DD47F}|ProjectManagmentAPI\\ProjectManagementAPI.csproj|solutionrelative:projectmanagmentapi\\appsettings.json||{90A6B3A7-C1A3-4009-A288-E2FF89E96FA0}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{286FDA71-084C-4F46-B794-2BB92B5DD47F}|ProjectManagmentAPI\\ProjectManagementAPI.csproj|c:\\users\\sciiphoz\\source\\repos\\projectmanagementapi\\projectmanagmentapi\\services\\backlogservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{286FDA71-084C-4F46-B794-2BB92B5DD47F}|ProjectManagmentAPI\\ProjectManagementAPI.csproj|solutionrelative:projectmanagmentapi\\services\\backlogservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{286FDA71-084C-4F46-B794-2BB92B5DD47F}|ProjectManagmentAPI\\ProjectManagementAPI.csproj|c:\\users\\sciiphoz\\source\\repos\\projectmanagementapi\\projectmanagmentapi\\controllers\\backlogcontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{286FDA71-084C-4F46-B794-2BB92B5DD47F}|ProjectManagmentAPI\\ProjectManagementAPI.csproj|solutionrelative:projectmanagmentapi\\controllers\\backlogcontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
       "AbsoluteMoniker": "D:0:0:{286FDA71-084C-4F46-B794-2BB92B5DD47F}|ProjectManagmentAPI\\ProjectManagementAPI.csproj|c:\\users\\sciiphoz\\source\\repos\\projectmanagementapi\\projectmanagmentapi\\services\\projectservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
       "RelativeMoniker": "D:0:0:{286FDA71-084C-4F46-B794-2BB92B5DD47F}|ProjectManagmentAPI\\ProjectManagementAPI.csproj|solutionrelative:projectmanagmentapi\\services\\projectservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
-      "AbsoluteMoniker": "D:0:0:{286FDA71-084C-4F46-B794-2BB92B5DD47F}|ProjectManagmentAPI\\ProjectManagementAPI.csproj|c:\\users\\sciiphoz\\source\\repos\\projectmanagementapi\\projectmanagmentapi\\services\\userservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{286FDA71-084C-4F46-B794-2BB92B5DD47F}|ProjectManagmentAPI\\ProjectManagementAPI.csproj|solutionrelative:projectmanagmentapi\\services\\userservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+      "AbsoluteMoniker": "D:0:0:{286FDA71-084C-4F46-B794-2BB92B5DD47F}|ProjectManagmentAPI\\ProjectManagementAPI.csproj|c:\\users\\sciiphoz\\source\\repos\\projectmanagementapi\\projectmanagmentapi\\controllers\\authcontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{286FDA71-084C-4F46-B794-2BB92B5DD47F}|ProjectManagmentAPI\\ProjectManagementAPI.csproj|solutionrelative:projectmanagmentapi\\controllers\\authcontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
-      "AbsoluteMoniker": "D:0:0:{286FDA71-084C-4F46-B794-2BB92B5DD47F}|ProjectManagmentAPI\\ProjectManagementAPI.csproj|c:\\users\\sciiphoz\\source\\repos\\projectmanagementapi\\projectmanagmentapi\\models\\user.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{286FDA71-084C-4F46-B794-2BB92B5DD47F}|ProjectManagmentAPI\\ProjectManagementAPI.csproj|solutionrelative:projectmanagmentapi\\models\\user.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+      "AbsoluteMoniker": "D:0:0:{286FDA71-084C-4F46-B794-2BB92B5DD47F}|ProjectManagmentAPI\\ProjectManagementAPI.csproj|c:\\users\\sciiphoz\\source\\repos\\projectmanagementapi\\projectmanagmentapi\\extensions\\claimsprincipalextensions.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{286FDA71-084C-4F46-B794-2BB92B5DD47F}|ProjectManagmentAPI\\ProjectManagementAPI.csproj|solutionrelative:projectmanagmentapi\\extensions\\claimsprincipalextensions.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{286FDA71-084C-4F46-B794-2BB92B5DD47F}|ProjectManagmentAPI\\ProjectManagementAPI.csproj|c:\\users\\sciiphoz\\source\\repos\\projectmanagementapi\\projectmanagmentapi\\services\\backlogservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{286FDA71-084C-4F46-B794-2BB92B5DD47F}|ProjectManagmentAPI\\ProjectManagementAPI.csproj|solutionrelative:projectmanagmentapi\\services\\backlogservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{286FDA71-084C-4F46-B794-2BB92B5DD47F}|ProjectManagmentAPI\\ProjectManagementAPI.csproj|c:\\users\\sciiphoz\\source\\repos\\projectmanagementapi\\projectmanagmentapi\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{286FDA71-084C-4F46-B794-2BB92B5DD47F}|ProjectManagmentAPI\\ProjectManagementAPI.csproj|solutionrelative:projectmanagmentapi\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     }
   ],
   "DocumentGroupContainers": [
@@ -46,7 +42,7 @@
       "DocumentGroups": [
         {
           "DockedWidth": 200,
-          "SelectedChildIndex": 3,
+          "SelectedChildIndex": 1,
           "Children": [
             {
               "$type": "Bookmark",
@@ -54,112 +50,100 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 6,
-              "Title": "ProjectService.cs",
-              "DocumentMoniker": "C:\\Users\\sciiphoz\\source\\repos\\ProjectManagementAPI\\ProjectManagmentAPI\\Services\\ProjectService.cs",
-              "RelativeDocumentMoniker": "ProjectManagmentAPI\\Services\\ProjectService.cs",
-              "ToolTip": "C:\\Users\\sciiphoz\\source\\repos\\ProjectManagementAPI\\ProjectManagmentAPI\\Services\\ProjectService.cs",
-              "RelativeToolTip": "ProjectManagmentAPI\\Services\\ProjectService.cs",
-              "ViewState": "AgIAAE8AAAAAAAAAAAArwDwAAAANAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-04-06T19:08:57.86Z"
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 3,
-              "Title": "appsettings.json",
-              "DocumentMoniker": "C:\\Users\\sciiphoz\\source\\repos\\ProjectManagementAPI\\ProjectManagmentAPI\\appsettings.json",
-              "RelativeDocumentMoniker": "ProjectManagmentAPI\\appsettings.json",
-              "ToolTip": "C:\\Users\\sciiphoz\\source\\repos\\ProjectManagementAPI\\ProjectManagmentAPI\\appsettings.json",
-              "RelativeToolTip": "ProjectManagmentAPI\\appsettings.json",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAIAAAD1AAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001642|",
-              "WhenOpened": "2026-04-06T15:57:52.147Z"
-            },
-            {
-              "$type": "Document",
               "DocumentIndex": 0,
+              "Title": "DashboardService.cs",
+              "DocumentMoniker": "C:\\Users\\sciiphoz\\source\\repos\\ProjectManagementAPI\\ProjectManagmentAPI\\Services\\DashboardService.cs",
+              "RelativeDocumentMoniker": "ProjectManagmentAPI\\Services\\DashboardService.cs",
+              "ToolTip": "C:\\Users\\sciiphoz\\source\\repos\\ProjectManagementAPI\\ProjectManagmentAPI\\Services\\DashboardService.cs",
+              "RelativeToolTip": "ProjectManagmentAPI\\Services\\DashboardService.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAABEBAAAeAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-04-12T10:15:47.856Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
+              "Title": "SubTaskService.cs",
+              "DocumentMoniker": "C:\\Users\\sciiphoz\\source\\repos\\ProjectManagementAPI\\ProjectManagmentAPI\\Services\\SubTaskService.cs",
+              "RelativeDocumentMoniker": "ProjectManagmentAPI\\Services\\SubTaskService.cs",
+              "ToolTip": "C:\\Users\\sciiphoz\\source\\repos\\ProjectManagementAPI\\ProjectManagmentAPI\\Services\\SubTaskService.cs",
+              "RelativeToolTip": "ProjectManagmentAPI\\Services\\SubTaskService.cs",
+              "ViewState": "AgIAAMkBAAAAAAAAAAAUwNgBAAAOAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-04-12T10:14:53.443Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 2,
               "Title": "SprintService.cs",
               "DocumentMoniker": "C:\\Users\\sciiphoz\\source\\repos\\ProjectManagementAPI\\ProjectManagmentAPI\\Services\\SprintService.cs",
               "RelativeDocumentMoniker": "ProjectManagmentAPI\\Services\\SprintService.cs",
               "ToolTip": "C:\\Users\\sciiphoz\\source\\repos\\ProjectManagementAPI\\ProjectManagmentAPI\\Services\\SprintService.cs",
               "RelativeToolTip": "ProjectManagmentAPI\\Services\\SprintService.cs",
-              "ViewState": "AgIAAPgBAAAAAAAAAAAqwBACAAAJAAAAAAAAAA==",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAA8AAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-04-06T11:23:35.209Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-04-12T10:14:14.397Z"
             },
             {
               "$type": "Document",
-              "DocumentIndex": 5,
-              "Title": "BacklogController.cs",
-              "DocumentMoniker": "C:\\Users\\sciiphoz\\source\\repos\\ProjectManagementAPI\\ProjectManagmentAPI\\Controllers\\BacklogController.cs",
-              "RelativeDocumentMoniker": "ProjectManagmentAPI\\Controllers\\BacklogController.cs",
-              "ToolTip": "C:\\Users\\sciiphoz\\source\\repos\\ProjectManagementAPI\\ProjectManagmentAPI\\Controllers\\BacklogController.cs",
-              "RelativeToolTip": "ProjectManagmentAPI\\Controllers\\BacklogController.cs",
-              "ViewState": "AgIAABQAAAAAAAAAAAAnwCMAAAAJAAAAAAAAAA==",
+              "DocumentIndex": 3,
+              "Title": "ProjectService.cs",
+              "DocumentMoniker": "C:\\Users\\sciiphoz\\source\\repos\\ProjectManagementAPI\\ProjectManagmentAPI\\Services\\ProjectService.cs",
+              "RelativeDocumentMoniker": "ProjectManagmentAPI\\Services\\ProjectService.cs",
+              "ToolTip": "C:\\Users\\sciiphoz\\source\\repos\\ProjectManagementAPI\\ProjectManagmentAPI\\Services\\ProjectService.cs",
+              "RelativeToolTip": "ProjectManagmentAPI\\Services\\ProjectService.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-04-06T07:20:44.919Z"
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 7,
-              "Title": "UserService.cs",
-              "DocumentMoniker": "C:\\Users\\sciiphoz\\source\\repos\\ProjectManagementAPI\\ProjectManagmentAPI\\Services\\UserService.cs",
-              "RelativeDocumentMoniker": "ProjectManagmentAPI\\Services\\UserService.cs",
-              "ToolTip": "C:\\Users\\sciiphoz\\source\\repos\\ProjectManagementAPI\\ProjectManagmentAPI\\Services\\UserService.cs",
-              "RelativeToolTip": "ProjectManagmentAPI\\Services\\UserService.cs",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAAA4AAAASAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-04-04T06:39:21.508Z"
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 2,
-              "Title": "Program.cs",
-              "DocumentMoniker": "C:\\Users\\sciiphoz\\source\\repos\\ProjectManagementAPI\\ProjectManagmentAPI\\Program.cs",
-              "RelativeDocumentMoniker": "ProjectManagmentAPI\\Program.cs",
-              "ToolTip": "C:\\Users\\sciiphoz\\source\\repos\\ProjectManagementAPI\\ProjectManagmentAPI\\Program.cs",
-              "RelativeToolTip": "ProjectManagmentAPI\\Program.cs",
-              "ViewState": "AgIAABsAAAAAAAAAAAAAAC0AAAAbAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-03-31T05:49:25.879Z"
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 1,
-              "Title": "ContextDB.cs",
-              "DocumentMoniker": "C:\\Users\\sciiphoz\\source\\repos\\ProjectManagementAPI\\ProjectManagmentAPI\\DataBaseContext\\ContextDB.cs",
-              "RelativeDocumentMoniker": "ProjectManagmentAPI\\DataBaseContext\\ContextDB.cs",
-              "ToolTip": "C:\\Users\\sciiphoz\\source\\repos\\ProjectManagementAPI\\ProjectManagmentAPI\\DataBaseContext\\ContextDB.cs",
-              "RelativeToolTip": "ProjectManagmentAPI\\DataBaseContext\\ContextDB.cs",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAoAAAAsAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-03-29T09:07:39.667Z"
+              "WhenOpened": "2026-04-12T10:13:49.616Z"
             },
             {
               "$type": "Document",
               "DocumentIndex": 4,
+              "Title": "AuthController.cs",
+              "DocumentMoniker": "C:\\Users\\sciiphoz\\source\\repos\\ProjectManagementAPI\\ProjectManagmentAPI\\Controllers\\AuthController.cs",
+              "RelativeDocumentMoniker": "ProjectManagmentAPI\\Controllers\\AuthController.cs",
+              "ToolTip": "C:\\Users\\sciiphoz\\source\\repos\\ProjectManagementAPI\\ProjectManagmentAPI\\Controllers\\AuthController.cs",
+              "RelativeToolTip": "ProjectManagmentAPI\\Controllers\\AuthController.cs",
+              "ViewState": "AgIAAAMAAAAAAAAAAAAAAJMAAAABAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-04-12T10:08:56.26Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 5,
+              "Title": "ClaimsPrincipalExtensions.cs",
+              "DocumentMoniker": "C:\\Users\\sciiphoz\\source\\repos\\ProjectManagementAPI\\ProjectManagmentAPI\\Extensions\\ClaimsPrincipalExtensions.cs",
+              "RelativeDocumentMoniker": "ProjectManagmentAPI\\Extensions\\ClaimsPrincipalExtensions.cs",
+              "ToolTip": "C:\\Users\\sciiphoz\\source\\repos\\ProjectManagementAPI\\ProjectManagmentAPI\\Extensions\\ClaimsPrincipalExtensions.cs",
+              "RelativeToolTip": "ProjectManagmentAPI\\Extensions\\ClaimsPrincipalExtensions.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAdAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-04-12T10:07:20.481Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 6,
               "Title": "BacklogService.cs",
               "DocumentMoniker": "C:\\Users\\sciiphoz\\source\\repos\\ProjectManagementAPI\\ProjectManagmentAPI\\Services\\BacklogService.cs",
               "RelativeDocumentMoniker": "ProjectManagmentAPI\\Services\\BacklogService.cs",
               "ToolTip": "C:\\Users\\sciiphoz\\source\\repos\\ProjectManagementAPI\\ProjectManagmentAPI\\Services\\BacklogService.cs",
               "RelativeToolTip": "ProjectManagmentAPI\\Services\\BacklogService.cs",
-              "ViewState": "AgIAAFgAAAAAAAAAAAAUwDgAAAA0AAAAAAAAAA==",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAqwAwAAAA/AAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-04-07T06:01:23.556Z"
+              "WhenOpened": "2026-04-12T09:56:23.235Z"
             },
             {
               "$type": "Document",
-              "DocumentIndex": 8,
-              "Title": "User.cs",
-              "DocumentMoniker": "C:\\Users\\sciiphoz\\source\\repos\\ProjectManagementAPI\\ProjectManagmentAPI\\Models\\User.cs",
-              "RelativeDocumentMoniker": "ProjectManagmentAPI\\Models\\User.cs",
-              "ToolTip": "C:\\Users\\sciiphoz\\source\\repos\\ProjectManagementAPI\\ProjectManagmentAPI\\Models\\User.cs",
-              "RelativeToolTip": "ProjectManagmentAPI\\Models\\User.cs",
-              "ViewState": "AgIAADUAAAAAAAAAAAAwwAAAAAAAAAAAAAAAAA==",
+              "DocumentIndex": 7,
+              "Title": "Program.cs",
+              "DocumentMoniker": "C:\\Users\\sciiphoz\\source\\repos\\ProjectManagementAPI\\ProjectManagmentAPI\\Program.cs",
+              "RelativeDocumentMoniker": "ProjectManagmentAPI\\Program.cs",
+              "ToolTip": "C:\\Users\\sciiphoz\\source\\repos\\ProjectManagementAPI\\ProjectManagmentAPI\\Program.cs",
+              "RelativeToolTip": "ProjectManagmentAPI\\Program.cs",
+              "ViewState": "AgIAAAkAAAAAAAAAAAAAAAUAAAAjAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-03-30T07:57:25.333Z"
+              "WhenOpened": "2026-03-31T05:49:25.879Z"
             }
           ]
         }

@@ -10,12 +10,12 @@ using System.Text.Json;
 
 namespace ProjectManagementAPI.Services
 {
-    public class BacklogService : IBacklogService
+    public class BacklogService : BaseService, IBacklogService 
     {
         private readonly ContextDb _context;
         private readonly INotificationService _notificationService;
 
-        public BacklogService(ContextDb context, INotificationService notificationService)
+        public BacklogService(ContextDb context, INotificationService notificationService, ILogger<UserService> logger) : base(logger)
         {
             _context = context;
             _notificationService = notificationService;
@@ -648,14 +648,13 @@ namespace ProjectManagementAPI.Services
 
         private async Task<BacklogItemResponse> MapToBacklogItemResponse(BacklogItem backlogItem)
         {
-            // Получаем подзадачи (только если они есть)
-            var subTasks = new List<SubTask>();
-            var commentsCount = 0;
-            var attachmentsCount = 0;
-            var activeBlockers = new List<BlockerResponse>();
-
             try
             {
+                var subTasks = new List<SubTask>();
+                var commentsCount = 0;
+                var attachmentsCount = 0;
+                var activeBlockers = new List<BlockerResponse>();
+
                 if (backlogItem.Id != Guid.Empty)
                 {
                     subTasks = await _context.SubTasks
@@ -680,81 +679,60 @@ namespace ProjectManagementAPI.Services
                         })
                         .ToListAsync();
                 }
+
+                return new BacklogItemResponse
+                {
+                    Id = backlogItem.Id,
+                    Type = backlogItem.Type.ToString(),
+                    Title = backlogItem.Title,
+                    Description = backlogItem.Description,
+                    AcceptanceCriteria = backlogItem.AcceptanceCriteria,
+                    Priority = backlogItem.Priority,
+                    StoryPoints = backlogItem.StoryPoints,
+                    EstimatedHours = backlogItem.EstimatedHours,
+                    Status = backlogItem.Status.ToString(),
+                    Assignee = backlogItem.Assignee != null ? new UserBriefResponse
+                    {
+                        Id = backlogItem.Assignee.Id,
+                        FullName = backlogItem.Assignee.FullName,
+                        Username = backlogItem.Assignee.Username
+                    } : null,
+                    CreatedBy = backlogItem.CreatedBy != null ? new UserBriefResponse
+                    {
+                        Id = backlogItem.CreatedBy.Id,
+                        FullName = backlogItem.CreatedBy.FullName,
+                        Username = backlogItem.CreatedBy.Username
+                    } : new UserBriefResponse { Id = Guid.Empty, FullName = "Неизвестный", Username = "unknown" },
+                    Sprint = backlogItem.Sprint != null ? new SprintBriefResponse
+                    {
+                        Id = backlogItem.Sprint.Id,
+                        Name = backlogItem.Sprint.Name,
+                        Status = backlogItem.Sprint.Status.ToString(),
+                        StartDate = backlogItem.Sprint.StartDate,
+                        EndDate = backlogItem.Sprint.EndDate,
+                        IsActive = backlogItem.Sprint.IsActive
+                    } : null,
+                    CreatedAt = backlogItem.CreatedAt,
+                    UpdatedAt = backlogItem.UpdatedAt,
+                    CompletedAt = backlogItem.CompletedAt,
+                    SprintPriority = backlogItem.SprintPriority,
+                    StartedAt = backlogItem.StartedAt,
+                    ActualHours = backlogItem.ActualHours,
+                    SubTasksCount = subTasks.Count,
+                    CompletedSubTasksCount = subTasks.Count(st => st.Status == SubTaskStatus.Done),
+                    CommentsCount = commentsCount,
+                    AttachmentsCount = attachmentsCount,
+                    ActiveBlockers = activeBlockers,
+                    Efficiency = backlogItem.EstimatedHours.HasValue && backlogItem.ActualHours.HasValue && backlogItem.ActualHours.Value > 0
+                        ? Math.Round((double)backlogItem.EstimatedHours.Value / backlogItem.ActualHours.Value * 100, 1)
+                        : null
+                };
             }
             catch (Exception ex)
             {
-                // Логируем ошибку, но продолжаем
-                Console.WriteLine($"Ошибка при получении дополнительных данных: {ex.Message}");
+                _logger.LogError(ex, "Ошибка при маппинге BacklogItem {Id}", backlogItem.Id);
+                throw;
             }
-
-            // Проверяем наличие Assignee
-            UserBriefResponse? assigneeResponse = null;
-            if (backlogItem.Assignee != null)
-            {
-                assigneeResponse = new UserBriefResponse
-                {
-                    Id = backlogItem.Assignee.Id,
-                    FullName = backlogItem.Assignee.FullName,
-                    Username = backlogItem.Assignee.Username
-                };
-            }
-
-            // Проверяем наличие CreatedBy
-            UserBriefResponse createdByResponse = new UserBriefResponse();
-            if (backlogItem.CreatedBy != null)
-            {
-                createdByResponse = new UserBriefResponse
-                {
-                    Id = backlogItem.CreatedBy.Id,
-                    FullName = backlogItem.CreatedBy.FullName,
-                    Username = backlogItem.CreatedBy.Username
-                };
-            }
-
-            // Проверяем наличие Sprint
-            SprintBriefResponse? sprintResponse = null;
-            if (backlogItem.Sprint != null)
-            {
-                sprintResponse = new SprintBriefResponse
-                {
-                    Id = backlogItem.Sprint.Id,
-                    Name = backlogItem.Sprint.Name,
-                    Status = backlogItem.Sprint.Status.ToString(),
-                    StartDate = backlogItem.Sprint.StartDate,
-                    EndDate = backlogItem.Sprint.EndDate,
-                    IsActive = backlogItem.Sprint.IsActive
-                };
-            }
-
-            return new BacklogItemResponse
-            {
-                Id = backlogItem.Id,
-                Type = backlogItem.Type.ToString(),
-                Title = backlogItem.Title,
-                Description = backlogItem.Description,
-                AcceptanceCriteria = backlogItem.AcceptanceCriteria,
-                Priority = backlogItem.Priority,
-                StoryPoints = backlogItem.StoryPoints,
-                EstimatedHours = backlogItem.EstimatedHours,
-                Status = backlogItem.Status.ToString(),
-                Assignee = assigneeResponse,
-                CreatedBy = createdByResponse,
-                Sprint = sprintResponse,
-                CreatedAt = backlogItem.CreatedAt,
-                UpdatedAt = backlogItem.UpdatedAt,
-                CompletedAt = backlogItem.CompletedAt,
-                SprintPriority = backlogItem.SprintPriority,
-                StartedAt = backlogItem.StartedAt,
-                ActualHours = backlogItem.ActualHours,
-                SubTasksCount = subTasks?.Count ?? 0,
-                CompletedSubTasksCount = subTasks?.Count(st => st.Status == SubTaskStatus.Done) ?? 0,
-                CommentsCount = commentsCount,
-                AttachmentsCount = attachmentsCount,
-                ActiveBlockers = activeBlockers ?? new List<BlockerResponse>(),
-                Efficiency = backlogItem.EstimatedHours.HasValue && backlogItem.ActualHours.HasValue && backlogItem.ActualHours.Value > 0
-                    ? Math.Round((double)backlogItem.EstimatedHours.Value / backlogItem.ActualHours.Value * 100, 1)
-                    : null
-            };
         }
 
         #endregion

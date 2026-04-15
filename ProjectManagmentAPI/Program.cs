@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using ProjectManagementAPI.DataBaseContext;
+using ProjectManagementAPI.Filter;
 using ProjectManagementAPI.Interfaces;
 using ProjectManagementAPI.Services;
 using System.Text;
@@ -9,7 +10,10 @@ using System.Text;
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
-builder.Services.AddControllers();
+builder.Services.AddControllers(options =>
+{
+    options.Filters.Add<GlobalExceptionFilter>();
+});
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
@@ -32,7 +36,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 
 builder.Services.AddAuthorization();
 
-// Database Context
+// Database Context with retry configuration
 builder.Services.AddDbContext<ContextDb>(options =>
 {
     options.UseSqlServer(builder.Configuration.GetConnectionString("DBConnection"), sqlOptions =>
@@ -43,6 +47,7 @@ builder.Services.AddDbContext<ContextDb>(options =>
             errorNumbersToAdd: null);
         sqlOptions.CommandTimeout(120);
     });
+    options.EnableSensitiveDataLogging(builder.Environment.IsDevelopment());
 }, ServiceLifetime.Scoped);
 
 // Register Services
@@ -57,7 +62,7 @@ builder.Services.AddScoped<IRetrospectiveService, RetrospectiveService>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddScoped<IPasswordHasher, PasswordHasher>();
 
-// CORS Configuration - объединенная политика
+// CORS Configuration
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowBlazor", policy =>
@@ -66,8 +71,6 @@ builder.Services.AddCors(options =>
                 "https://localhost:5000",
                 "https://localhost:5001",
                 "http://localhost:5000",
-                "https://localhost:5259",
-                "http://localhost:5259",
                 "https://localhost:7064",
                 "http://localhost:5146"
             )
@@ -87,20 +90,35 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
-
-// CORS - должен быть между UseHttpsRedirection и UseAuthentication
 app.UseCors("AllowBlazor");
-
 app.UseAuthentication();
 app.UseAuthorization();
-
 app.MapControllers();
 
-// Optional: Auto-migrate database on startup (uncomment if needed)
+// Auto-migrate database on startup with retry
 using (var scope = app.Services.CreateScope())
 {
     var dbContext = scope.ServiceProvider.GetRequiredService<ContextDb>();
-    // dbContext.Database.Migrate(); // Раскомментировать для автоматического применения миграций
+    var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+
+    for (int i = 0; i < 3; i++)
+    {
+        try
+        {
+            if (dbContext.Database.GetPendingMigrations().Any())
+            {
+                logger.LogInformation("Применение миграций...");
+                dbContext.Database.Migrate();
+            }
+            break;
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, $"Попытка {i + 1}/3 подключения к БД не удалась");
+            if (i == 2) throw;
+            await Task.Delay(5000);
+        }
+    }
 }
 
 app.Run();

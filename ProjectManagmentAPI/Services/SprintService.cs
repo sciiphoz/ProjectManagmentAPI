@@ -1,20 +1,23 @@
 ﻿using Microsoft.EntityFrameworkCore;
-using ProjectManagementAPI.Models;
+using ProjectManagementAPI.DataBaseContext;
 using ProjectManagementAPI.DTO.Common;
+using ProjectManagementAPI.DTO.Requests;
 using ProjectManagementAPI.DTO.Responses;
 using ProjectManagementAPI.Interfaces;
-using ProjectManagementAPI.DataBaseContext;
+using ProjectManagementAPI.Models;
 using ProjectManagementAPI.Enums;
-using ProjectManagementAPI.DTO.Requests;
 
 namespace ProjectManagementAPI.Services
 {
-    public class SprintService : ISprintService
+    public class SprintService : BaseService, ISprintService
     {
         private readonly ContextDb _context;
         private readonly INotificationService _notificationService;
 
-        public SprintService(ContextDb context, INotificationService notificationService)
+        public SprintService(
+            ContextDb context,
+            INotificationService notificationService,
+            ILogger<SprintService> logger) : base(logger)
         {
             _context = context;
             _notificationService = notificationService;
@@ -22,561 +25,717 @@ namespace ProjectManagementAPI.Services
 
         public async Task<ApiResponse<SprintResponse>> CreateSprintAsync(CreateSprintRequest request)
         {
-            var project = await _context.Projects.FindAsync(request.ProjectId);
-            if (project == null)
+            try
             {
-                return ApiResponse<SprintResponse>.Fail("Проект не найден");
+                var project = await _context.Projects.FindAsync(request.ProjectId);
+                if (project == null)
+                {
+                    return ApiResponse<SprintResponse>.Fail("Проект не найден");
+                }
+
+                if (request.EndDate < request.StartDate)
+                {
+                    return ApiResponse<SprintResponse>.Fail("Дата окончания не может быть раньше даты начала");
+                }
+
+                var sprint = new Sprint
+                {
+                    Id = Guid.NewGuid(),
+                    ProjectId = request.ProjectId,
+                    Name = request.Name,
+                    Goal = request.Goal,
+                    StartDate = request.StartDate,
+                    EndDate = request.EndDate,
+                    IsActive = false,
+                    Status = SprintStatus.Planned,
+                    CreatedAt = DateTime.UtcNow
+                };
+
+                _context.Sprints.Add(sprint);
+                await _context.SaveChangesAsync();
+
+                var response = await MapToSprintResponse(sprint);
+                return ApiResponse<SprintResponse>.Ok(response, "Спринт создан");
             }
-
-            var sprint = new Sprint
+            catch (Exception ex)
             {
-                Id = Guid.NewGuid(),
-                ProjectId = request.ProjectId,
-                Name = request.Name,
-                Goal = request.Goal,
-                StartDate = request.StartDate,
-                EndDate = request.EndDate,
-                IsActive = false,
-                Status = SprintStatus.Planned,
-                CreatedAt = DateTime.UtcNow
-            };
-
-            _context.Sprints.Add(sprint);
-            await _context.SaveChangesAsync();
-
-            var response = await MapToSprintResponse(sprint);
-            return ApiResponse<SprintResponse>.Ok(response, "Спринт создан");
+                _logger.LogError(ex, "Ошибка создания спринта");
+                return ApiResponse<SprintResponse>.Fail("Произошла ошибка при создании спринта");
+            }
         }
 
         public async Task<ApiResponse<SprintResponse>> GetSprintByIdAsync(Guid sprintId)
         {
-            var sprint = await _context.Sprints
-                .Include(s => s.Project)
-                .FirstOrDefaultAsync(s => s.Id == sprintId);
-
-            if (sprint == null)
+            try
             {
-                return ApiResponse<SprintResponse>.Fail("Спринт не найден");
-            }
+                var sprint = await _context.Sprints
+                    .Include(s => s.Project)
+                    .FirstOrDefaultAsync(s => s.Id == sprintId);
 
-            var response = await MapToSprintResponse(sprint);
-            return ApiResponse<SprintResponse>.Ok(response);
+                if (sprint == null)
+                {
+                    return ApiResponse<SprintResponse>.Fail("Спринт не найден");
+                }
+
+                var response = await MapToSprintResponse(sprint);
+                return ApiResponse<SprintResponse>.Ok(response);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Ошибка получения спринта {SprintId}", sprintId);
+                return ApiResponse<SprintResponse>.Fail("Произошла ошибка при получении данных спринта");
+            }
         }
 
         public async Task<ApiResponse<List<SprintBriefResponse>>> GetProjectSprintsAsync(Guid projectId)
         {
-            var sprints = await _context.Sprints
-                .Where(s => s.ProjectId == projectId)
-                .OrderByDescending(s => s.StartDate)
-                .Select(s => new SprintBriefResponse
-                {
-                    Id = s.Id,
-                    Name = s.Name,
-                    Status = s.Status.ToString(),
-                    StartDate = s.StartDate,
-                    EndDate = s.EndDate,
-                    IsActive = s.IsActive
-                })
-                .ToListAsync();
+            try
+            {
+                var sprints = await _context.Sprints
+                    .Where(s => s.ProjectId == projectId)
+                    .OrderByDescending(s => s.StartDate)
+                    .Select(s => new SprintBriefResponse
+                    {
+                        Id = s.Id,
+                        Name = s.Name,
+                        Status = s.Status.ToString(),
+                        StartDate = s.StartDate,
+                        EndDate = s.EndDate,
+                        IsActive = s.IsActive
+                    })
+                    .ToListAsync();
 
-            return ApiResponse<List<SprintBriefResponse>>.Ok(sprints);
+                return ApiResponse<List<SprintBriefResponse>>.Ok(sprints);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Ошибка получения спринтов проекта {ProjectId}", projectId);
+                return ApiResponse<List<SprintBriefResponse>>.Fail("Произошла ошибка при получении списка спринтов");
+            }
         }
 
         public async Task<ApiResponse<SprintResponse>> UpdateSprintAsync(Guid sprintId, UpdateSprintRequest request)
         {
-            var sprint = await _context.Sprints.FindAsync(sprintId);
-            if (sprint == null)
+            try
             {
-                return ApiResponse<SprintResponse>.Fail("Спринт не найден");
+                var sprint = await _context.Sprints.FindAsync(sprintId);
+                if (sprint == null)
+                {
+                    return ApiResponse<SprintResponse>.Fail("Спринт не найден");
+                }
+
+                if (request.Name != null)
+                    sprint.Name = request.Name;
+
+                if (request.Goal != null)
+                    sprint.Goal = request.Goal;
+
+                if (request.StartDate.HasValue)
+                    sprint.StartDate = request.StartDate.Value;
+
+                if (request.EndDate.HasValue)
+                {
+                    if (request.EndDate.Value < sprint.StartDate)
+                    {
+                        return ApiResponse<SprintResponse>.Fail("Дата окончания не может быть раньше даты начала");
+                    }
+                    sprint.EndDate = request.EndDate.Value;
+                }
+
+                if (request.Status != null && Enum.TryParse<SprintStatus>(request.Status, true, out var status))
+                    sprint.Status = status;
+
+                await _context.SaveChangesAsync();
+
+                var response = await MapToSprintResponse(sprint);
+                return ApiResponse<SprintResponse>.Ok(response, "Спринт обновлен");
             }
-
-            if (request.Name != null)
-                sprint.Name = request.Name;
-
-            if (request.Goal != null)
-                sprint.Goal = request.Goal;
-
-            if (request.StartDate.HasValue)
-                sprint.StartDate = request.StartDate.Value;
-
-            if (request.EndDate.HasValue)
-                sprint.EndDate = request.EndDate.Value;
-
-            if (request.Status != null && Enum.TryParse<SprintStatus>(request.Status, true, out var status))
-                sprint.Status = status;
-
-            await _context.SaveChangesAsync();
-
-            var response = await MapToSprintResponse(sprint);
-            return ApiResponse<SprintResponse>.Ok(response, "Спринт обновлен");
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Ошибка обновления спринта {SprintId}", sprintId);
+                return ApiResponse<SprintResponse>.Fail("Произошла ошибка при обновлении спринта");
+            }
         }
 
         public async Task<ApiResponse> DeleteSprintAsync(Guid sprintId)
         {
-            var sprint = await _context.Sprints
-                .Include(s => s.BacklogItems)
-                .FirstOrDefaultAsync(s => s.Id == sprintId);
-
-            if (sprint == null)
+            try
             {
-                return ApiResponse.Fail("Спринт не найден");
-            }
+                var sprint = await _context.Sprints
+                    .Include(s => s.BacklogItems)
+                    .FirstOrDefaultAsync(s => s.Id == sprintId);
 
-            foreach (var item in sprint.BacklogItems)
+                if (sprint == null)
+                {
+                    return ApiResponse.Fail("Спринт не найден");
+                }
+
+                foreach (var item in sprint.BacklogItems)
+                {
+                    item.SprintId = null;
+                    item.Status = BacklogItemStatus.Backlog;
+                }
+
+                _context.Sprints.Remove(sprint);
+                await _context.SaveChangesAsync();
+
+                return ApiResponse.Ok("Спринт удален");
+            }
+            catch (Exception ex)
             {
-                item.SprintId = null;
-                item.Status = BacklogItemStatus.Backlog;
+                _logger.LogError(ex, "Ошибка удаления спринта {SprintId}", sprintId);
+                return ApiResponse.Fail("Произошла ошибка при удалении спринта");
             }
-
-            _context.Sprints.Remove(sprint);
-            await _context.SaveChangesAsync();
-
-            return ApiResponse.Ok("Спринт удален");
         }
 
         public async Task<ApiResponse<SprintResponse>> StartSprintAsync(StartSprintRequest request)
         {
-            var sprint = await _context.Sprints.FindAsync(request.SprintId);
-            if (sprint == null)
+            try
             {
-                return ApiResponse<SprintResponse>.Fail("Спринт не найден");
-            }
-
-            if (sprint.IsActive)
-            {
-                return ApiResponse<SprintResponse>.Fail("Спринт уже активен");
-            }
-
-            for (int i = 0; i < request.BacklogItemIds.Count; i++)
-            {
-                var backlogItem = await _context.BacklogItems.FindAsync(request.BacklogItemIds[i]);
-                if (backlogItem != null && backlogItem.ProjectId == sprint.ProjectId)
+                var sprint = await _context.Sprints.FindAsync(request.SprintId);
+                if (sprint == null)
                 {
-                    backlogItem.SprintId = sprint.Id;
-                    backlogItem.Status = BacklogItemStatus.ToDo;
-                    backlogItem.SprintPriority = i;
+                    return ApiResponse<SprintResponse>.Fail("Спринт не найден");
                 }
+
+                if (sprint.IsActive)
+                {
+                    return ApiResponse<SprintResponse>.Fail("Спринт уже активен");
+                }
+
+                if (sprint.Status != SprintStatus.Planned)
+                {
+                    return ApiResponse<SprintResponse>.Fail("Можно запустить только спринт в статусе Planned");
+                }
+
+                for (int i = 0; i < request.BacklogItemIds.Count; i++)
+                {
+                    var backlogItem = await _context.BacklogItems.FindAsync(request.BacklogItemIds[i]);
+                    if (backlogItem != null && backlogItem.ProjectId == sprint.ProjectId)
+                    {
+                        backlogItem.SprintId = sprint.Id;
+                        backlogItem.Status = BacklogItemStatus.ToDo;
+                        backlogItem.SprintPriority = i;
+                    }
+                }
+
+                var totalStoryPoints = await _context.BacklogItems
+                    .Where(bi => bi.SprintId == sprint.Id)
+                    .SumAsync(bi => bi.StoryPoints ?? 0);
+
+                sprint.IsActive = true;
+                sprint.Status = SprintStatus.Active;
+                sprint.CommittedStoryPoints = (int)totalStoryPoints;
+
+                await _context.SaveChangesAsync();
+
+                await _notificationService.NotifyProjectMembersAsync(
+                    sprint.ProjectId,
+                    "Спринт начат",
+                    $"Спринт '{sprint.Name}' начат. Запланировано {request.BacklogItemIds.Count} задач",
+                    "Info",
+                    $"/sprints/{sprint.Id}",
+                    sprint.Id,
+                    "Sprint"
+                );
+
+                var response = await MapToSprintResponse(sprint);
+                return ApiResponse<SprintResponse>.Ok(response, "Спринт запущен");
             }
-
-            var totalStoryPoints = await _context.BacklogItems
-                .Where(bi => bi.SprintId == sprint.Id)
-                .SumAsync(bi => bi.StoryPoints ?? 0);
-
-            sprint.IsActive = true;
-            sprint.Status = SprintStatus.Active;
-            sprint.CommittedStoryPoints = (int)totalStoryPoints;
-
-            await _context.SaveChangesAsync();
-
-            await _notificationService.NotifyProjectMembersAsync(
-                sprint.ProjectId,
-                "Спринт начат",
-                $"Спринт '{sprint.Name}' начат. Запланировано {request.BacklogItemIds.Count} задач",
-                "Info",
-                $"/sprints/{sprint.Id}",
-                sprint.Id,
-                "Sprint"
-            );
-
-            var response = await MapToSprintResponse(sprint);
-            return ApiResponse<SprintResponse>.Ok(response, "Спринт запущен");
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Ошибка запуска спринта {SprintId}", request.SprintId);
+                return ApiResponse<SprintResponse>.Fail("Произошла ошибка при запуске спринта");
+            }
         }
 
         public async Task<ApiResponse<SprintResponse>> CompleteSprintAsync(CompleteSprintRequest request)
         {
-            var sprint = await _context.Sprints
-                .Include(s => s.BacklogItems)
-                .FirstOrDefaultAsync(s => s.Id == request.SprintId);
-
-            if (sprint == null)
+            try
             {
-                return ApiResponse<SprintResponse>.Fail("Спринт не найден");
+                var sprint = await _context.Sprints
+                    .Include(s => s.BacklogItems)
+                    .FirstOrDefaultAsync(s => s.Id == request.SprintId);
+
+                if (sprint == null)
+                {
+                    return ApiResponse<SprintResponse>.Fail("Спринт не найден");
+                }
+
+                if (!sprint.IsActive)
+                {
+                    return ApiResponse<SprintResponse>.Fail("Спринт не активен");
+                }
+
+                var completedStoryPoints = sprint.BacklogItems
+                    .Where(bi => bi.Status == BacklogItemStatus.Done)
+                    .Sum(bi => bi.StoryPoints ?? 0);
+
+                foreach (var item in sprint.BacklogItems.Where(bi => bi.Status != BacklogItemStatus.Done))
+                {
+                    item.SprintId = null;
+                    item.Status = BacklogItemStatus.Backlog;
+                    item.SprintPriority = null;
+                }
+
+                sprint.IsActive = false;
+                sprint.Status = SprintStatus.Completed;
+                sprint.CompletedStoryPoints = (int)completedStoryPoints;
+                sprint.CompletedAt = DateTime.UtcNow;
+                sprint.ReviewNotes = request.ReviewNotes;
+                sprint.RetrospectiveNotes = request.RetrospectiveNotes;
+
+                var velocity = new SprintVelocity
+                {
+                    Id = Guid.NewGuid(),
+                    SprintId = sprint.Id,
+                    TotalStoryPoints = sprint.CommittedStoryPoints ?? 0,
+                    CompletedStoryPoints = completedStoryPoints,
+                    CommittedTasksCount = sprint.BacklogItems.Count,
+                    CompletedTasksCount = sprint.BacklogItems.Count(bi => bi.Status == BacklogItemStatus.Done),
+                    Velocity = completedStoryPoints,
+                    CalculatedAt = DateTime.UtcNow
+                };
+
+                _context.SprintVelocities.Add(velocity);
+                await _context.SaveChangesAsync();
+
+                await _notificationService.NotifyProjectMembersAsync(
+                    sprint.ProjectId,
+                    "Спринт завершен",
+                    $"Спринт '{sprint.Name}' завершен. Выполнено {completedStoryPoints} из {sprint.CommittedStoryPoints} Story Points",
+                    "Success",
+                    $"/sprints/{sprint.Id}",
+                    sprint.Id,
+                    "Sprint"
+                );
+
+                var response = await MapToSprintResponse(sprint);
+                return ApiResponse<SprintResponse>.Ok(response, "Спринт завершен");
             }
-
-            if (!sprint.IsActive)
+            catch (Exception ex)
             {
-                return ApiResponse<SprintResponse>.Fail("Спринт не активен");
+                _logger.LogError(ex, "Ошибка завершения спринта {SprintId}", request.SprintId);
+                return ApiResponse<SprintResponse>.Fail("Произошла ошибка при завершении спринта");
             }
-
-            var completedStoryPoints = sprint.BacklogItems
-                .Where(bi => bi.Status == BacklogItemStatus.Done)
-                .Sum(bi => bi.StoryPoints ?? 0);
-
-            foreach (var item in sprint.BacklogItems.Where(bi => bi.Status != BacklogItemStatus.Done))
-            {
-                item.SprintId = null;
-                item.Status = BacklogItemStatus.Backlog;
-                item.SprintPriority = null;
-            }
-
-            sprint.IsActive = false;
-            sprint.Status = SprintStatus.Completed;
-            sprint.CompletedStoryPoints = (int)completedStoryPoints;
-            sprint.CompletedAt = DateTime.UtcNow;
-            sprint.ReviewNotes = request.ReviewNotes;
-            sprint.RetrospectiveNotes = request.RetrospectiveNotes;
-
-            var velocity = new SprintVelocity
-            {
-                Id = Guid.NewGuid(),
-                SprintId = sprint.Id,
-                TotalStoryPoints = sprint.CommittedStoryPoints ?? 0,
-                CompletedStoryPoints = completedStoryPoints,
-                CommittedTasksCount = sprint.BacklogItems.Count,
-                CompletedTasksCount = sprint.BacklogItems.Count(bi => bi.Status == BacklogItemStatus.Done),
-                Velocity = completedStoryPoints,
-                CalculatedAt = DateTime.UtcNow
-            };
-
-            _context.SprintVelocities.Add(velocity);
-            await _context.SaveChangesAsync();
-
-            await _notificationService.NotifyProjectMembersAsync(
-                sprint.ProjectId,
-                "Спринт завершен",
-                $"Спринт '{sprint.Name}' завершен. Выполнено {completedStoryPoints} из {sprint.CommittedStoryPoints} Story Points",
-                "Success",
-                $"/sprints/{sprint.Id}",
-                sprint.Id,
-                "Sprint"
-            );
-
-            var response = await MapToSprintResponse(sprint);
-            return ApiResponse<SprintResponse>.Ok(response, "Спринт завершен");
         }
 
         public async Task<ApiResponse> CancelSprintAsync(Guid sprintId)
         {
-            var sprint = await _context.Sprints
-                .Include(s => s.BacklogItems)
-                .FirstOrDefaultAsync(s => s.Id == sprintId);
-
-            if (sprint == null)
+            try
             {
-                return ApiResponse.Fail("Спринт не найден");
-            }
+                var sprint = await _context.Sprints
+                    .Include(s => s.BacklogItems)
+                    .FirstOrDefaultAsync(s => s.Id == sprintId);
 
-            foreach (var item in sprint.BacklogItems)
+                if (sprint == null)
+                {
+                    return ApiResponse.Fail("Спринт не найден");
+                }
+
+                foreach (var item in sprint.BacklogItems)
+                {
+                    item.SprintId = null;
+                    item.Status = BacklogItemStatus.Backlog;
+                    item.SprintPriority = null;
+                }
+
+                sprint.IsActive = false;
+                sprint.Status = SprintStatus.Cancelled;
+
+                await _context.SaveChangesAsync();
+
+                return ApiResponse.Ok("Спринт отменен");
+            }
+            catch (Exception ex)
             {
-                item.SprintId = null;
-                item.Status = BacklogItemStatus.Backlog;
-                item.SprintPriority = null;
+                _logger.LogError(ex, "Ошибка отмены спринта {SprintId}", sprintId);
+                return ApiResponse.Fail("Произошла ошибка при отмене спринта");
             }
-
-            sprint.IsActive = false;
-            sprint.Status = SprintStatus.Cancelled;
-
-            await _context.SaveChangesAsync();
-
-            return ApiResponse.Ok("Спринт отменен");
         }
 
         public async Task<ApiResponse<SprintBoardResponse>> GetSprintBoardAsync(Guid sprintId)
         {
-            var sprint = await _context.Sprints
-                .Include(s => s.BacklogItems)
-                    .ThenInclude(bi => bi.Assignee)
-                .Include(s => s.BacklogItems)
-                    .ThenInclude(bi => bi.SubTasks)
-                .Include(s => s.BacklogItems)
-                    .ThenInclude(bi => bi.Blockers)
-                .FirstOrDefaultAsync(s => s.Id == sprintId);
-
-            if (sprint == null)
+            try
             {
-                return ApiResponse<SprintBoardResponse>.Fail("Спринт не найден");
-            }
+                var sprint = await _context.Sprints
+                    .Include(s => s.BacklogItems)
+                        .ThenInclude(bi => bi.Assignee)
+                    .Include(s => s.BacklogItems)
+                        .ThenInclude(bi => bi.SubTasks)
+                    .Include(s => s.BacklogItems)
+                        .ThenInclude(bi => bi.Blockers)
+                    .FirstOrDefaultAsync(s => s.Id == sprintId);
 
-            var boardTasks = sprint.BacklogItems.Select(bi => new BacklogItemBoardResponse
-            {
-                Id = bi.Id,
-                Title = bi.Title,
-                Type = bi.Type.ToString(),
-                Status = bi.Status.ToString(),
-                Priority = bi.Priority,
-                StoryPoints = bi.StoryPoints,
-                EstimatedHours = bi.EstimatedHours,
-                Assignee = bi.Assignee != null ? new UserBriefResponse
+                if (sprint == null)
                 {
-                    Id = bi.Assignee.Id,
-                    FullName = bi.Assignee.FullName,
-                    Username = bi.Assignee.Username
-                } : null,
-                HasBlockers = bi.Blockers.Any(b => b.Status == BlockerStatus.Active),
-                SubTasksCount = bi.SubTasks.Count,
-                CompletedSubTasksCount = bi.SubTasks.Count(st => st.Status == SubTaskStatus.Done)
-            }).ToList();
+                    return ApiResponse<SprintBoardResponse>.Fail("Спринт не найден");
+                }
 
-            var metricsResult = await GetSprintMetricsAsync(sprintId);
-            var burndownResult = await GetBurndownChartAsync(sprintId);
+                var boardTasks = sprint.BacklogItems.Select(bi => new BacklogItemBoardResponse
+                {
+                    Id = bi.Id,
+                    Title = bi.Title,
+                    Type = bi.Type.ToString(),
+                    Status = bi.Status.ToString(),
+                    Priority = bi.Priority,
+                    StoryPoints = bi.StoryPoints,
+                    EstimatedHours = bi.EstimatedHours,
+                    Assignee = bi.Assignee != null ? new UserBriefResponse
+                    {
+                        Id = bi.Assignee.Id,
+                        FullName = bi.Assignee.FullName,
+                        Username = bi.Assignee.Username
+                    } : null,
+                    HasBlockers = bi.Blockers.Any(b => b.Status == BlockerStatus.Active),
+                    SubTasksCount = bi.SubTasks.Count,
+                    CompletedSubTasksCount = bi.SubTasks.Count(st => st.Status == SubTaskStatus.Done)
+                }).ToList();
 
-            var response = new SprintBoardResponse
+                var metricsResult = await GetSprintMetricsAsync(sprintId);
+                var burndownResult = await GetBurndownChartAsync(sprintId);
+
+                var response = new SprintBoardResponse
+                {
+                    Id = sprint.Id,
+                    Name = sprint.Name,
+                    Goal = sprint.Goal,
+                    StartDate = sprint.StartDate,
+                    EndDate = sprint.EndDate,
+                    IsActive = sprint.IsActive,
+                    Status = sprint.Status.ToString(),
+                    CreatedAt = sprint.CreatedAt,
+                    TotalTasksCount = sprint.BacklogItems.Count,
+                    CompletedTasksCount = sprint.BacklogItems.Count(bi => bi.Status == BacklogItemStatus.Done),
+                    TotalStoryPoints = sprint.BacklogItems.Sum(bi => bi.StoryPoints),
+                    CompletedStoryPoints = sprint.BacklogItems.Where(bi => bi.Status == BacklogItemStatus.Done).Sum(bi => bi.StoryPoints),
+                    CompletionPercentage = sprint.BacklogItems.Any()
+                        ? (double)sprint.BacklogItems.Count(bi => bi.Status == BacklogItemStatus.Done) / sprint.BacklogItems.Count * 100
+                        : 0,
+                    DaysRemaining = sprint.IsActive ? (sprint.EndDate - DateTime.UtcNow.Date).Days : 0,
+                    Tasks = boardTasks,
+                    Metrics = metricsResult.Data ?? new SprintMetrics(),
+                    BurndownData = burndownResult.Data ?? new List<BurndownPoint>()
+                };
+
+                return ApiResponse<SprintBoardResponse>.Ok(response);
+            }
+            catch (Exception ex)
             {
-                Id = sprint.Id,
-                Name = sprint.Name,
-                Goal = sprint.Goal,
-                StartDate = sprint.StartDate,
-                EndDate = sprint.EndDate,
-                IsActive = sprint.IsActive,
-                Status = sprint.Status.ToString(),
-                CreatedAt = sprint.CreatedAt,
-                TotalTasksCount = sprint.BacklogItems.Count,
-                CompletedTasksCount = sprint.BacklogItems.Count(bi => bi.Status == BacklogItemStatus.Done),
-                TotalStoryPoints = sprint.BacklogItems.Sum(bi => bi.StoryPoints),
-                CompletedStoryPoints = sprint.BacklogItems.Where(bi => bi.Status == BacklogItemStatus.Done).Sum(bi => bi.StoryPoints),
-                CompletionPercentage = sprint.BacklogItems.Any()
-                    ? (double)sprint.BacklogItems.Count(bi => bi.Status == BacklogItemStatus.Done) / sprint.BacklogItems.Count * 100
-                    : 0,
-                DaysRemaining = sprint.IsActive ? (sprint.EndDate - DateTime.UtcNow.Date).Days : 0,
-                Tasks = boardTasks,
-                Metrics = metricsResult.Data ?? new SprintMetrics(),
-                BurndownData = burndownResult.Data ?? new List<BurndownPoint>()
-            };
-
-            return ApiResponse<SprintBoardResponse>.Ok(response);
+                _logger.LogError(ex, "Ошибка получения доски спринта {SprintId}", sprintId);
+                return ApiResponse<SprintBoardResponse>.Fail("Произошла ошибка при получении данных доски спринта");
+            }
         }
 
         public async Task<ApiResponse> UpdateTaskStatusAsync(Guid taskId, string newStatus)
         {
-            var task = await _context.BacklogItems.FindAsync(taskId);
-            if (task == null)
+            try
             {
-                return ApiResponse.Fail("Задача не найдена");
+                var task = await _context.BacklogItems.FindAsync(taskId);
+                if (task == null)
+                {
+                    return ApiResponse.Fail("Задача не найдена");
+                }
+
+                if (!Enum.TryParse<BacklogItemStatus>(newStatus, true, out var status))
+                {
+                    return ApiResponse.Fail("Неверный статус");
+                }
+
+                var oldStatus = task.Status;
+                task.Status = status;
+
+                if (status == BacklogItemStatus.InProgress && !task.StartedAt.HasValue)
+                {
+                    task.StartedAt = DateTime.UtcNow;
+                }
+
+                if (status == BacklogItemStatus.Done && !task.CompletedAt.HasValue)
+                {
+                    var subTasks = await _context.SubTasks
+                        .Where(st => st.BacklogItemId == taskId)
+                        .ToListAsync();
+
+                    if (subTasks.Any() && subTasks.Any(st => st.Status != SubTaskStatus.Done))
+                    {
+                        return ApiResponse.Fail("Нельзя завершить задачу, пока не выполнены все подзадачи");
+                    }
+                    task.CompletedAt = DateTime.UtcNow;
+                }
+
+                task.UpdatedAt = DateTime.UtcNow;
+                await _context.SaveChangesAsync();
+
+                _context.ActivityLogs.Add(new ActivityLog
+                {
+                    ProjectId = task.ProjectId,
+                    UserId = task.AssigneeId ?? Guid.Empty,
+                    ActionType = ActionType.TaskStatusChanged,
+                    EntityType = "BacklogItem",
+                    EntityId = task.Id,
+                    Description = $"Статус задачи '{task.Title}' изменен с {oldStatus} на {status}",
+                    CreatedAt = DateTime.UtcNow
+                });
+
+                await _context.SaveChangesAsync();
+
+                return ApiResponse.Ok("Статус задачи обновлен");
             }
-
-            if (!Enum.TryParse<BacklogItemStatus>(newStatus, true, out var status))
+            catch (Exception ex)
             {
-                return ApiResponse.Fail("Неверный статус");
+                _logger.LogError(ex, "Ошибка обновления статуса задачи {TaskId}", taskId);
+                return ApiResponse.Fail("Произошла ошибка при обновлении статуса задачи");
             }
-
-            var oldStatus = task.Status;
-            task.Status = status;
-
-            if (status == BacklogItemStatus.InProgress && !task.StartedAt.HasValue)
-            {
-                task.StartedAt = DateTime.UtcNow;
-            }
-
-            if (status == BacklogItemStatus.Done && !task.CompletedAt.HasValue)
-            {
-                task.CompletedAt = DateTime.UtcNow;
-            }
-
-            task.UpdatedAt = DateTime.UtcNow;
-            await _context.SaveChangesAsync();
-
-            _context.ActivityLogs.Add(new ActivityLog
-            {
-                ProjectId = task.ProjectId,
-                UserId = task.AssigneeId ?? Guid.Empty,
-                ActionType = ActionType.TaskStatusChanged,
-                EntityType = "BacklogItem",
-                EntityId = task.Id,
-                Description = $"Статус задачи '{task.Title}' изменен с {oldStatus} на {status}",
-                CreatedAt = DateTime.UtcNow
-            });
-
-            await _context.SaveChangesAsync();
-
-            return ApiResponse.Ok("Статус задачи обновлен");
         }
 
         public async Task<ApiResponse> MoveToSprintAsync(MoveToSprintRequest request)
         {
-            var sprint = await _context.Sprints.FindAsync(request.SprintId);
-            if (sprint == null)
+            try
             {
-                return ApiResponse.Fail("Спринт не найден");
-            }
-
-            for (int i = 0; i < request.BacklogItemIds.Count; i++)
-            {
-                var item = await _context.BacklogItems.FindAsync(request.BacklogItemIds[i]);
-                if (item != null && item.ProjectId == sprint.ProjectId)
+                var sprint = await _context.Sprints.FindAsync(request.SprintId);
+                if (sprint == null)
                 {
-                    item.SprintId = sprint.Id;
-                    item.Status = BacklogItemStatus.ToDo;
-                    item.SprintPriority = i;
+                    return ApiResponse.Fail("Спринт не найден");
                 }
-            }
 
-            await _context.SaveChangesAsync();
-            return ApiResponse.Ok("Задачи перемещены в спринт");
+                for (int i = 0; i < request.BacklogItemIds.Count; i++)
+                {
+                    var item = await _context.BacklogItems.FindAsync(request.BacklogItemIds[i]);
+                    if (item != null && item.ProjectId == sprint.ProjectId && item.SprintId == null)
+                    {
+                        item.SprintId = sprint.Id;
+                        item.Status = BacklogItemStatus.ToDo;
+                        item.SprintPriority = i;
+                    }
+                }
+
+                await _context.SaveChangesAsync();
+                return ApiResponse.Ok("Задачи перемещены в спринт");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Ошибка перемещения задач в спринт");
+                return ApiResponse.Fail("Произошла ошибка при перемещении задач");
+            }
         }
 
         public async Task<ApiResponse> MoveToBacklogAsync(Guid backlogItemId)
         {
-            var item = await _context.BacklogItems.FindAsync(backlogItemId);
-            if (item == null)
+            try
             {
-                return ApiResponse.Fail("Задача не найдена");
+                var item = await _context.BacklogItems.FindAsync(backlogItemId);
+                if (item == null)
+                {
+                    return ApiResponse.Fail("Задача не найдена");
+                }
+
+                item.SprintId = null;
+                item.Status = BacklogItemStatus.Backlog;
+                item.SprintPriority = null;
+                await _context.SaveChangesAsync();
+
+                return ApiResponse.Ok("Задача перемещена в бэклог");
             }
-
-            item.SprintId = null;
-            item.Status = BacklogItemStatus.Backlog;
-            item.SprintPriority = null;
-            await _context.SaveChangesAsync();
-
-            return ApiResponse.Ok("Задача перемещена в бэклог");
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Ошибка перемещения задачи в бэклог {BacklogItemId}", backlogItemId);
+                return ApiResponse.Fail("Произошла ошибка при перемещении задачи");
+            }
         }
 
         public async Task<ApiResponse<SprintMetrics>> GetSprintMetricsAsync(Guid sprintId)
         {
-            var sprint = await _context.Sprints
-                .Include(s => s.BacklogItems)
-                    .ThenInclude(bi => bi.Assignee)
-                .FirstOrDefaultAsync(s => s.Id == sprintId);
-
-            if (sprint == null)
+            try
             {
-                return ApiResponse<SprintMetrics>.Fail("Спринт не найден");
+                var sprint = await _context.Sprints
+                    .Include(s => s.BacklogItems)
+                        .ThenInclude(bi => bi.Assignee)
+                    .FirstOrDefaultAsync(s => s.Id == sprintId);
+
+                if (sprint == null)
+                {
+                    return ApiResponse<SprintMetrics>.Fail("Спринт не найден");
+                }
+
+                var tasksByStatus = sprint.BacklogItems
+                    .GroupBy(bi => bi.Status.ToString())
+                    .ToDictionary(g => g.Key, g => g.Count());
+
+                var tasksByAssignee = sprint.BacklogItems
+                    .Where(bi => bi.Assignee != null)
+                    .GroupBy(bi => bi.Assignee!.FullName)
+                    .ToDictionary(g => g.Key, g => g.Count());
+
+                var burndownResult = await GetBurndownChartAsync(sprintId);
+
+                var metrics = new SprintMetrics
+                {
+                    Velocity = sprint.CompletedStoryPoints ?? 0,
+                    TasksByStatus = tasksByStatus,
+                    TasksByAssignee = tasksByAssignee,
+                    BurndownData = burndownResult.Data ?? new List<BurndownPoint>()
+                };
+
+                return ApiResponse<SprintMetrics>.Ok(metrics);
             }
-
-            var tasksByStatus = sprint.BacklogItems
-                .GroupBy(bi => bi.Status.ToString())
-                .ToDictionary(g => g.Key, g => g.Count());
-
-            var tasksByAssignee = sprint.BacklogItems
-                .Where(bi => bi.Assignee != null)
-                .GroupBy(bi => bi.Assignee!.FullName)
-                .ToDictionary(g => g.Key, g => g.Count());
-
-            var burndownResult = await GetBurndownChartAsync(sprintId);
-
-            var metrics = new SprintMetrics
+            catch (Exception ex)
             {
-                Velocity = sprint.CompletedStoryPoints ?? 0,
-                TasksByStatus = tasksByStatus,
-                TasksByAssignee = tasksByAssignee,
-                BurndownData = burndownResult.Data ?? new List<BurndownPoint>()
-            };
-
-            return ApiResponse<SprintMetrics>.Ok(metrics);
+                _logger.LogError(ex, "Ошибка получения метрик спринта {SprintId}", sprintId);
+                return ApiResponse<SprintMetrics>.Fail("Произошла ошибка при получении метрик");
+            }
         }
 
         public async Task<ApiResponse<List<BurndownPoint>>> GetBurndownChartAsync(Guid sprintId)
         {
-            var sprint = await _context.Sprints
-                .Include(s => s.BacklogItems)
-                    .ThenInclude(bi => bi.SubTasks)
-                .FirstOrDefaultAsync(s => s.Id == sprintId);
-
-            if (sprint == null)
+            try
             {
-                return ApiResponse<List<BurndownPoint>>.Fail("Спринт не найден");
-            }
+                var sprint = await _context.Sprints
+                    .Include(s => s.BacklogItems)
+                        .ThenInclude(bi => bi.SubTasks)
+                    .FirstOrDefaultAsync(s => s.Id == sprintId);
 
-            var burndownPoints = new List<BurndownPoint>();
-
-            // Рассчитываем общее количество часов
-            var totalHours = sprint.BacklogItems
-                .Sum(bi => bi.EstimatedHours ?? 0) +
-                sprint.BacklogItems
-                    .SelectMany(bi => bi.SubTasks)
-                    .Sum(st => st.EstimatedHours ?? 0);
-
-            // Если нет задач с оценкой времени, возвращаем пустой список
-            if (totalHours == 0)
-            {
-                return ApiResponse<List<BurndownPoint>>.Ok(new List<BurndownPoint>(), "Нет данных для графика");
-            }
-
-            var days = (sprint.EndDate - sprint.StartDate).Days;
-            if (days <= 0) days = 1;
-
-            var dailyIdealBurn = totalHours / days;
-
-            // Создаем словарь выполненных часов по дням
-            var completedHoursPerDay = new Dictionary<DateTime, decimal>();
-
-            foreach (var task in sprint.BacklogItems.Where(bi => bi.Status == BacklogItemStatus.Done && bi.CompletedAt.HasValue))
-            {
-                var completedDate = task.CompletedAt!.Value.Date;
-                var taskHours = (task.EstimatedHours ?? 0) + task.SubTasks.Sum(st => st.EstimatedHours ?? 0);
-
-                if (!completedHoursPerDay.ContainsKey(completedDate))
-                    completedHoursPerDay[completedDate] = 0;
-
-                completedHoursPerDay[completedDate] += taskHours;
-            }
-
-            var remaining = totalHours;
-            var currentDate = sprint.StartDate.Date;
-
-            while (currentDate <= sprint.EndDate.Date)
-            {
-                // Вычитаем выполненные в этот день часы
-                if (completedHoursPerDay.ContainsKey(currentDate))
+                if (sprint == null)
                 {
-                    remaining -= completedHoursPerDay[currentDate];
+                    return ApiResponse<List<BurndownPoint>>.Fail("Спринт не найден");
                 }
 
-                var idealRemaining = Math.Max(0, totalHours - dailyIdealBurn * (currentDate - sprint.StartDate.Date).Days);
-                var actualRemaining = Math.Max(0, remaining);
+                var burndownPoints = new List<BurndownPoint>();
 
-                burndownPoints.Add(new BurndownPoint
+                var totalHours = sprint.BacklogItems
+                    .Sum(bi => bi.EstimatedHours ?? 0) +
+                    sprint.BacklogItems
+                        .SelectMany(bi => bi.SubTasks)
+                        .Sum(st => st.EstimatedHours ?? 0);
+
+                if (totalHours == 0)
                 {
-                    Date = currentDate,
-                    RemainingHours = actualRemaining,
-                    IdealRemainingHours = idealRemaining,
-                    RemainingStoryPoints = 0
-                });
+                    return ApiResponse<List<BurndownPoint>>.Ok(new List<BurndownPoint>(), "Нет данных для графика");
+                }
 
-                currentDate = currentDate.AddDays(1);
+                var days = (sprint.EndDate - sprint.StartDate).Days;
+                if (days <= 0) days = 1;
+
+                var dailyIdealBurn = totalHours / days;
+
+                var completedHoursPerDay = new Dictionary<DateTime, decimal>();
+
+                foreach (var task in sprint.BacklogItems.Where(bi => bi.Status == BacklogItemStatus.Done && bi.CompletedAt.HasValue))
+                {
+                    var completedDate = task.CompletedAt!.Value.Date;
+                    var taskHours = (task.EstimatedHours ?? 0) + task.SubTasks.Sum(st => st.EstimatedHours ?? 0);
+
+                    if (!completedHoursPerDay.ContainsKey(completedDate))
+                        completedHoursPerDay[completedDate] = 0;
+
+                    completedHoursPerDay[completedDate] += taskHours;
+                }
+
+                var remaining = totalHours;
+                var currentDate = sprint.StartDate.Date;
+
+                while (currentDate <= sprint.EndDate.Date)
+                {
+                    if (completedHoursPerDay.ContainsKey(currentDate))
+                    {
+                        remaining -= completedHoursPerDay[currentDate];
+                    }
+
+                    var idealRemaining = Math.Max(0, totalHours - dailyIdealBurn * (currentDate - sprint.StartDate.Date).Days);
+                    var actualRemaining = Math.Max(0, remaining);
+
+                    burndownPoints.Add(new BurndownPoint
+                    {
+                        Date = currentDate,
+                        RemainingHours = actualRemaining,
+                        IdealRemainingHours = idealRemaining,
+                        RemainingStoryPoints = 0
+                    });
+
+                    currentDate = currentDate.AddDays(1);
+                }
+
+                return ApiResponse<List<BurndownPoint>>.Ok(burndownPoints);
             }
-
-            return ApiResponse<List<BurndownPoint>>.Ok(burndownPoints);
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Ошибка получения графика сгорания спринта {SprintId}", sprintId);
+                return ApiResponse<List<BurndownPoint>>.Fail("Произошла ошибка при получении данных графика");
+            }
         }
 
         public async Task<ApiResponse> SaveReviewNotesAsync(Guid sprintId, string notes)
         {
-            var sprint = await _context.Sprints.FindAsync(sprintId);
-            if (sprint == null)
+            try
             {
-                return ApiResponse.Fail("Спринт не найден");
+                var sprint = await _context.Sprints.FindAsync(sprintId);
+                if (sprint == null)
+                {
+                    return ApiResponse.Fail("Спринт не найден");
+                }
+
+                sprint.ReviewNotes = notes;
+                await _context.SaveChangesAsync();
+
+                return ApiResponse.Ok("Заметки Sprint Review сохранены");
             }
-
-            sprint.ReviewNotes = notes;
-            await _context.SaveChangesAsync();
-
-            return ApiResponse.Ok("Заметки Sprint Review сохранены");
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Ошибка сохранения заметок Review спринта {SprintId}", sprintId);
+                return ApiResponse.Fail("Произошла ошибка при сохранении заметок");
+            }
         }
 
         public async Task<ApiResponse> SaveRetrospectiveNotesAsync(Guid sprintId, string notes)
         {
-            var sprint = await _context.Sprints.FindAsync(sprintId);
-            if (sprint == null)
+            try
             {
-                return ApiResponse.Fail("Спринт не найден");
+                var sprint = await _context.Sprints.FindAsync(sprintId);
+                if (sprint == null)
+                {
+                    return ApiResponse.Fail("Спринт не найден");
+                }
+
+                sprint.RetrospectiveNotes = notes;
+                await _context.SaveChangesAsync();
+
+                return ApiResponse.Ok("Заметки ретроспективы сохранены");
             }
-
-            sprint.RetrospectiveNotes = notes;
-            await _context.SaveChangesAsync();
-
-            return ApiResponse.Ok("Заметки ретроспективы сохранены");
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Ошибка сохранения заметок ретроспективы спринта {SprintId}", sprintId);
+                return ApiResponse.Fail("Произошла ошибка при сохранении заметок");
+            }
         }
 
         public async Task<ApiResponse<List<SprintVelocityHistory>>> GetSprintHistoryAsync(Guid projectId, int count = 5)
         {
-            var history = await _context.SprintVelocities
-                .Include(sv => sv.Sprint)
-                .Where(sv => sv.Sprint.ProjectId == projectId)
-                .OrderByDescending(sv => sv.Sprint.EndDate)
-                .Take(count)
-                .Select(sv => new SprintVelocityHistory
-                {
-                    SprintId = sv.SprintId,
-                    SprintName = sv.Sprint.Name,
-                    EndDate = sv.Sprint.EndDate,
-                    TotalStoryPoints = sv.TotalStoryPoints,
-                    CompletedStoryPoints = sv.CompletedStoryPoints,
-                    Velocity = sv.Velocity,
-                    CommittedTasks = sv.CommittedTasksCount,
-                    CompletedTasks = sv.CompletedTasksCount
-                })
-                .ToListAsync();
+            try
+            {
+                var history = await _context.SprintVelocities
+                    .Include(sv => sv.Sprint)
+                    .Where(sv => sv.Sprint.ProjectId == projectId)
+                    .OrderByDescending(sv => sv.Sprint.EndDate)
+                    .Take(count)
+                    .Select(sv => new SprintVelocityHistory
+                    {
+                        SprintId = sv.SprintId,
+                        SprintName = sv.Sprint.Name,
+                        EndDate = sv.Sprint.EndDate,
+                        TotalStoryPoints = sv.TotalStoryPoints,
+                        CompletedStoryPoints = sv.CompletedStoryPoints,
+                        Velocity = sv.Velocity,
+                        CommittedTasks = sv.CommittedTasksCount,
+                        CompletedTasks = sv.CompletedTasksCount
+                    })
+                    .ToListAsync();
 
-            return ApiResponse<List<SprintVelocityHistory>>.Ok(history);
+                return ApiResponse<List<SprintVelocityHistory>>.Ok(history);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Ошибка получения истории спринтов проекта {ProjectId}", projectId);
+                return ApiResponse<List<SprintVelocityHistory>>.Fail("Произошла ошибка при получении истории спринтов");
+            }
         }
 
         #region Private Methods

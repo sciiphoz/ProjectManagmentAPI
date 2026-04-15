@@ -1,5 +1,4 @@
-﻿// Extensions/ClaimsPrincipalExtensions.cs
-using System.Security.Claims;
+﻿using System.Security.Claims;
 
 namespace ProjectManagementAPI.Extensions
 {
