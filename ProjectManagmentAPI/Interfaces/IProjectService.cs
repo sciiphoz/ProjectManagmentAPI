@@ -21,7 +21,7 @@ namespace ProjectManagementAPI.Interfaces
 
         // Управление участниками
         Task<ApiResponse<List<ProjectMemberResponse>>> GetProjectMembersAsync(Guid projectId);
-        Task<ApiResponse<ProjectMemberResponse>> AddMemberAsync(Guid projectId, AddProjectMemberRequest request);
+        Task<ApiResponse<ProjectMemberResponse>> AddMemberAsync(Guid projectId, AddProjectMemberRequest request, Guid currentUserId);
         Task<ApiResponse> UpdateMemberRoleAsync(Guid projectId, UpdateMemberRoleRequest request);
         Task<ApiResponse> RemoveMemberAsync(Guid projectId, RemoveMemberRequest request);
 

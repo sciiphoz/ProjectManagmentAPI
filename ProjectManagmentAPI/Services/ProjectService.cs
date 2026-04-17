@@ -266,7 +266,7 @@ namespace ProjectManagementAPI.Services
             }
         }
 
-        public async Task<ApiResponse<ProjectMemberResponse>> AddMemberAsync(Guid projectId, AddProjectMemberRequest request)
+        public async Task<ApiResponse<ProjectMemberResponse>> AddMemberAsync(Guid projectId, AddProjectMemberRequest request, Guid currentUserId)
         {
             try
             {
@@ -276,40 +276,62 @@ namespace ProjectManagementAPI.Services
                     return ApiResponse<ProjectMemberResponse>.Fail("Проект не найден");
                 }
 
-                var user = await _context.Users.FindAsync(request.UserId);
-                if (user == null)
+                // Проверка прав
+                var isOwner = project.OwnerId == currentUserId;
+                var currentMember = await _context.ProjectMembers
+                    .FirstOrDefaultAsync(pm => pm.ProjectId == projectId && pm.UserId == currentUserId);
+
+                var canAdd = isOwner || (currentMember != null &&
+                    (currentMember.RoleInProject == ProjectRole.ProductOwner ||
+                     currentMember.RoleInProject == ProjectRole.ScrumMaster));
+
+                if (!canAdd)
                 {
-                    return ApiResponse<ProjectMemberResponse>.Fail("Пользователь не найден");
+                    return ApiResponse<ProjectMemberResponse>.Fail("У вас нет прав для добавления участников");
                 }
 
+                // Находим пользователя по email (если передан email) или по ID
+                User? user = null;
+                if (!string.IsNullOrEmpty(request.Email))
+                {
+                    user = await _context.Users.FirstOrDefaultAsync(u => u.Email == request.Email);
+                }
+                else if (request.UserId.HasValue)
+                {
+                    user = await _context.Users.FindAsync(request.UserId.Value);
+                }
+
+                if (user == null)
+                {
+                    return ApiResponse<ProjectMemberResponse>.Fail($"Пользователь не найден");
+                }
+
+                // Проверяем, не является ли пользователь уже участником
                 var existingMember = await _context.ProjectMembers
-                    .AnyAsync(pm => pm.ProjectId == projectId && pm.UserId == request.UserId);
+                    .AnyAsync(pm => pm.ProjectId == projectId && pm.UserId == user.Id);
 
                 if (existingMember)
                 {
                     return ApiResponse<ProjectMemberResponse>.Fail("Пользователь уже является участником проекта");
                 }
 
-                if (!Enum.TryParse<ProjectRole>(request.Role, true, out var role))
-                {
-                    return ApiResponse<ProjectMemberResponse>.Fail("Неверная роль");
-                }
-
+                // Добавляем участника
                 var member = new ProjectMember
                 {
                     ProjectId = projectId,
-                    UserId = request.UserId,
-                    RoleInProject = role,
+                    UserId = user.Id,
+                    RoleInProject = Enum.Parse<ProjectRole>(request.Role),
                     JoinedAt = DateTime.UtcNow
                 };
 
                 _context.ProjectMembers.Add(member);
                 await _context.SaveChangesAsync();
 
+                // Отправляем уведомление
                 await _notificationService.CreateNotificationAsync(
-                    request.UserId,
+                    user.Id,
                     "Приглашение в проект",
-                    $"Вы были добавлены в проект '{project.Name}' в роли {role}",
+                    $"Вы были добавлены в проект '{project.Name}' в роли {request.Role}",
                     "Info",
                     $"/projects/{projectId}",
                     projectId,
@@ -322,7 +344,7 @@ namespace ProjectManagementAPI.Services
                     FullName = user.FullName,
                     Username = user.Username,
                     Email = user.Email,
-                    Role = role.ToString(),
+                    Role = request.Role,
                     JoinedAt = member.JoinedAt,
                     IsOwner = false
                 };

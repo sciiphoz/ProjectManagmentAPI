@@ -1,5 +1,61 @@
 [
   {
+    "ContainingType": "ProjectManagementAPI.Controllers.ActivityLogsController",
+    "Method": "GetProjectLogs",
+    "RelativePath": "api/ActivityLogs",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "projectId",
+        "Type": "System.Guid",
+        "IsRequired": false
+      },
+      {
+        "Name": "pageNumber",
+        "Type": "System.Int32",
+        "IsRequired": false
+      },
+      {
+        "Name": "pageSize",
+        "Type": "System.Int32",
+        "IsRequired": false
+      },
+      {
+        "Name": "userId",
+        "Type": "System.Nullable\u00601[[System.Guid, System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]]",
+        "IsRequired": false
+      },
+      {
+        "Name": "actionType",
+        "Type": "System.String",
+        "IsRequired": false
+      },
+      {
+        "Name": "dateFrom",
+        "Type": "System.Nullable\u00601[[System.DateTime, System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]]",
+        "IsRequired": false
+      },
+      {
+        "Name": "dateTo",
+        "Type": "System.Nullable\u00601[[System.DateTime, System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]]",
+        "IsRequired": false
+      }
+    ],
+    "ReturnTypes": [
+      {
+        "Type": "ProjectManagementAPI.DTO.Common.ApiResponse\u00601[[ProjectManagementAPI.DTO.Common.PagedResult\u00601[[ProjectManagementAPI.DTO.Responses.ActivityLogResponse, ProjectManagementAPI, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]], ProjectManagementAPI, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]",
+        "MediaTypes": [
+          "text/plain",
+          "application/json",
+          "text/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
+  },
+  {
     "ContainingType": "ProjectManagementAPI.Controllers.AuthController",
     "Method": "ConfirmEmail",
     "RelativePath": "api/Auth/confirm-email",

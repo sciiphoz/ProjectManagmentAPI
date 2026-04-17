@@ -113,7 +113,8 @@ namespace ProjectManagementAPI.Controllers
         [HttpPost("{projectId}/members")]
         public async Task<ActionResult<ApiResponse<ProjectMemberResponse>>> AddMember(Guid projectId, AddProjectMemberRequest request)
         {
-            var response = await _projectService.AddMemberAsync(projectId, request);
+            var currentUserId = User.GetUserId();
+            var response = await _projectService.AddMemberAsync(projectId, request, currentUserId);
             return Ok(response);
         }
 

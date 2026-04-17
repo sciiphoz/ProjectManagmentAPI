@@ -83,10 +83,11 @@ namespace ProjectManagementAPI.Services
         public async Task<ApiResponse<PagedResult<BacklogItemResponse>>> GetProjectBacklogAsync(Guid projectId, PagedRequest request)
         {
             var query = _context.BacklogItems
-                .Where(bi => bi.ProjectId == projectId && bi.SprintId == null)
+                .Where(bi => bi.ProjectId == projectId)
                 .Include(bi => bi.Assignee)
                 .Include(bi => bi.CreatedBy)
-                .OrderBy(bi => bi.OrderInBacklog);
+                .Include(bi => bi.Sprint)
+                .AsQueryable();
 
             if (!string.IsNullOrWhiteSpace(request.SearchTerm))
             {

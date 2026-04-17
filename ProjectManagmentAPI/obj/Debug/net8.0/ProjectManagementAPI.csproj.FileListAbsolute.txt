@@ -280,3 +280,5 @@ C:\Users\sciiphoz\source\repos\ProjectManagementAPI\ProjectManagmentAPI\obj\Debu
 C:\Users\sciiphoz\source\repos\ProjectManagementAPI\ProjectManagmentAPI\obj\Debug\net8.0\ref\ProjectManagementAPI.dll
 C:\Users\sciiphoz\source\repos\ProjectManagementAPI\ProjectManagmentAPI\bin\Debug\net8.0\BCrypt.Net-Next.dll
 C:\Users\sciiphoz\source\repos\ProjectManagementAPI\ProjectManagmentAPI\bin\Debug\net8.0\Microsoft.AspNetCore.Authentication.JwtBearer.dll
+C:\Users\sciiphoz\source\repos\ProjectManagmentAPI\ProjectManagmentAPI\bin\Debug\net8.0\BCrypt.Net-Next.dll
+C:\Users\sciiphoz\source\repos\ProjectManagmentAPI\ProjectManagmentAPI\bin\Debug\net8.0\Microsoft.AspNetCore.Authentication.JwtBearer.dll

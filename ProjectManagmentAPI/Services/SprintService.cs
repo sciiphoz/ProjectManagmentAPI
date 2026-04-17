@@ -203,19 +203,25 @@ namespace ProjectManagementAPI.Services
                     return ApiResponse<SprintResponse>.Fail("Спринт уже активен");
                 }
 
+                // Исправленная проверка статуса - сравниваем с числовым значением
                 if (sprint.Status != SprintStatus.Planned)
                 {
-                    return ApiResponse<SprintResponse>.Fail("Можно запустить только спринт в статусе Planned");
+                    _logger.LogWarning($"Спринт {sprint.Id} имеет статус {sprint.Status}, ожидался Planned");
+                    return ApiResponse<SprintResponse>.Fail($"Спринт можно запустить только в статусе Planned. Текущий статус: {sprint.Status}");
                 }
 
-                for (int i = 0; i < request.BacklogItemIds.Count; i++)
+                // Обновляем статус задач
+                if (request.BacklogItemIds != null && request.BacklogItemIds.Any())
                 {
-                    var backlogItem = await _context.BacklogItems.FindAsync(request.BacklogItemIds[i]);
-                    if (backlogItem != null && backlogItem.ProjectId == sprint.ProjectId)
+                    for (int i = 0; i < request.BacklogItemIds.Count; i++)
                     {
-                        backlogItem.SprintId = sprint.Id;
-                        backlogItem.Status = BacklogItemStatus.ToDo;
-                        backlogItem.SprintPriority = i;
+                        var backlogItem = await _context.BacklogItems.FindAsync(request.BacklogItemIds[i]);
+                        if (backlogItem != null && backlogItem.ProjectId == sprint.ProjectId)
+                        {
+                            backlogItem.SprintId = sprint.Id;
+                            backlogItem.Status = BacklogItemStatus.ToDo;
+                            backlogItem.SprintPriority = i;
+                        }
                     }
                 }
 
@@ -229,23 +235,13 @@ namespace ProjectManagementAPI.Services
 
                 await _context.SaveChangesAsync();
 
-                await _notificationService.NotifyProjectMembersAsync(
-                    sprint.ProjectId,
-                    "Спринт начат",
-                    $"Спринт '{sprint.Name}' начат. Запланировано {request.BacklogItemIds.Count} задач",
-                    "Info",
-                    $"/sprints/{sprint.Id}",
-                    sprint.Id,
-                    "Sprint"
-                );
-
                 var response = await MapToSprintResponse(sprint);
                 return ApiResponse<SprintResponse>.Ok(response, "Спринт запущен");
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Ошибка запуска спринта {SprintId}", request.SprintId);
-                return ApiResponse<SprintResponse>.Fail("Произошла ошибка при запуске спринта");
+                return ApiResponse<SprintResponse>.Fail($"Произошла ошибка при запуске спринта: {ex.Message}");
             }
         }
 
@@ -267,11 +263,20 @@ namespace ProjectManagementAPI.Services
                     return ApiResponse<SprintResponse>.Fail("Спринт не активен");
                 }
 
+                _logger.LogInformation($"Завершение спринта {sprint.Id}. Всего задач: {sprint.BacklogItems.Count}");
+
+                // Подсчет выполненных Story Points
                 var completedStoryPoints = sprint.BacklogItems
                     .Where(bi => bi.Status == BacklogItemStatus.Done)
                     .Sum(bi => bi.StoryPoints ?? 0);
 
-                foreach (var item in sprint.BacklogItems.Where(bi => bi.Status != BacklogItemStatus.Done))
+                _logger.LogInformation($"Выполнено Story Points: {completedStoryPoints}");
+
+                // Перенос незавершенных задач обратно в бэклог
+                var incompleteTasks = sprint.BacklogItems.Where(bi => bi.Status != BacklogItemStatus.Done).ToList();
+                _logger.LogInformation($"Незавершенных задач: {incompleteTasks.Count}");
+
+                foreach (var item in incompleteTasks)
                 {
                     item.SprintId = null;
                     item.Status = BacklogItemStatus.Backlog;
@@ -285,6 +290,7 @@ namespace ProjectManagementAPI.Services
                 sprint.ReviewNotes = request.ReviewNotes;
                 sprint.RetrospectiveNotes = request.RetrospectiveNotes;
 
+                // Сохраняем Velocity
                 var velocity = new SprintVelocity
                 {
                     Id = Guid.NewGuid(),
@@ -300,15 +306,7 @@ namespace ProjectManagementAPI.Services
                 _context.SprintVelocities.Add(velocity);
                 await _context.SaveChangesAsync();
 
-                await _notificationService.NotifyProjectMembersAsync(
-                    sprint.ProjectId,
-                    "Спринт завершен",
-                    $"Спринт '{sprint.Name}' завершен. Выполнено {completedStoryPoints} из {sprint.CommittedStoryPoints} Story Points",
-                    "Success",
-                    $"/sprints/{sprint.Id}",
-                    sprint.Id,
-                    "Sprint"
-                );
+                _logger.LogInformation($"Спринт {sprint.Id} успешно завершен. Velocity: {completedStoryPoints}");
 
                 var response = await MapToSprintResponse(sprint);
                 return ApiResponse<SprintResponse>.Ok(response, "Спринт завершен");
@@ -316,7 +314,7 @@ namespace ProjectManagementAPI.Services
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Ошибка завершения спринта {SprintId}", request.SprintId);
-                return ApiResponse<SprintResponse>.Fail("Произошла ошибка при завершении спринта");
+                return ApiResponse<SprintResponse>.Fail($"Произошла ошибка при завершении спринта: {ex.Message}");
             }
         }
 
@@ -405,6 +403,7 @@ namespace ProjectManagementAPI.Services
                     IsActive = sprint.IsActive,
                     Status = sprint.Status.ToString(),
                     CreatedAt = sprint.CreatedAt,
+                    ProjectId = sprint.ProjectId,
                     TotalTasksCount = sprint.BacklogItems.Count,
                     CompletedTasksCount = sprint.BacklogItems.Count(bi => bi.Status == BacklogItemStatus.Done),
                     TotalStoryPoints = sprint.BacklogItems.Sum(bi => bi.StoryPoints),
@@ -417,6 +416,9 @@ namespace ProjectManagementAPI.Services
                     Metrics = metricsResult.Data ?? new SprintMetrics(),
                     BurndownData = burndownResult.Data ?? new List<BurndownPoint>()
                 };
+
+                // Добавим отладочный вывод
+                Console.WriteLine($"SprintBoardResponse создан: Id={response.Id}, ProjectId={response.ProjectId}");
 
                 return ApiResponse<SprintBoardResponse>.Ok(response);
             }
@@ -498,24 +500,36 @@ namespace ProjectManagementAPI.Services
                     return ApiResponse.Fail("Спринт не найден");
                 }
 
-                for (int i = 0; i < request.BacklogItemIds.Count; i++)
+                if (sprint.IsActive)
                 {
-                    var item = await _context.BacklogItems.FindAsync(request.BacklogItemIds[i]);
-                    if (item != null && item.ProjectId == sprint.ProjectId && item.SprintId == null)
-                    {
-                        item.SprintId = sprint.Id;
-                        item.Status = BacklogItemStatus.ToDo;
-                        item.SprintPriority = i;
-                    }
+                    return ApiResponse.Fail("Нельзя перемещать задачи в активный спринт. Сначала завершите спринт.");
+                }
+
+                var backlogItems = await _context.BacklogItems
+                    .Where(bi => request.BacklogItemIds.Contains(bi.Id))
+                    .ToListAsync();
+
+                if (backlogItems.Count == 0)
+                {
+                    return ApiResponse.Fail("Задачи не найдены");
+                }
+
+                foreach (var item in backlogItems)
+                {
+                    item.SprintId = sprint.Id;
+                    item.Status = BacklogItemStatus.ToDo;
                 }
 
                 await _context.SaveChangesAsync();
+
+                _logger.LogInformation($"Перемещено {backlogItems.Count} задач в спринт {sprint.Id}");
+
                 return ApiResponse.Ok("Задачи перемещены в спринт");
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Ошибка перемещения задач в спринт");
-                return ApiResponse.Fail("Произошла ошибка при перемещении задач");
+                return ApiResponse.Fail($"Произошла ошибка: {ex.Message}");
             }
         }
 
@@ -766,6 +780,7 @@ namespace ProjectManagementAPI.Services
                 IsActive = sprint.IsActive,
                 Status = sprint.Status.ToString(),
                 CreatedAt = sprint.CreatedAt,
+                ProjectId = sprint.ProjectId,
                 TotalTasksCount = totalTasks,
                 CompletedTasksCount = completedTasks,
                 TotalStoryPoints = totalStoryPoints,

@@ -51,6 +51,7 @@ builder.Services.AddDbContext<ContextDb>(options =>
 }, ServiceLifetime.Scoped);
 
 // Register Services
+builder.Services.AddScoped<IActivityLogService, ActivityLogService>();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IProjectService, ProjectService>();
 builder.Services.AddScoped<ISprintService, SprintService>();

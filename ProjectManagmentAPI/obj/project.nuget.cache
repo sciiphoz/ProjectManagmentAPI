@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "FZ2RSlLjLys=",
+  "dgSpecHash": "9hmAotQlRgQ=",
   "success": true,
-  "projectFilePath": "C:\\Users\\sciiphoz\\source\\repos\\ProjectManagementAPI\\ProjectManagmentAPI\\ProjectManagementAPI.csproj",
+  "projectFilePath": "C:\\Users\\sciiphoz\\source\\repos\\ProjectManagmentAPI\\ProjectManagmentAPI\\ProjectManagementAPI.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\sciiphoz\\.nuget\\packages\\azure.core\\1.35.0\\azure.core.1.35.0.nupkg.sha512",
     "C:\\Users\\sciiphoz\\.nuget\\packages\\azure.identity\\1.10.3\\azure.identity.1.10.3.nupkg.sha512",

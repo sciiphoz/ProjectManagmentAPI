@@ -35,13 +35,13 @@ namespace ProjectManagementAPI.DTO.Requests
         public string? Status { get; set; }
     }
 
+    // DTOs/Requests/StartSprintRequest.cs
     public class StartSprintRequest
     {
         [Required]
         public Guid SprintId { get; set; }
 
-        [Required]
-        public List<Guid> BacklogItemIds { get; set; } = new();
+        public List<Guid> BacklogItemIds { get; set; } = new List<Guid>();
     }
 
     public class CompleteSprintRequest

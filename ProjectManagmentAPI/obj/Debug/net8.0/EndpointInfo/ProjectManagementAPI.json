@@ -5,6 +5,94 @@
     "version": "1.0"
   },
   "paths": {
+    "/api/ActivityLogs": {
+      "get": {
+        "tags": [
+          "ActivityLogs"
+        ],
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "pageNumber",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 1
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 20
+            }
+          },
+          {
+            "name": "userId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "actionType",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "dateFrom",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "dateTo",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActivityLogResponsePagedResultApiResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActivityLogResponsePagedResultApiResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActivityLogResponsePagedResultApiResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/Auth/register": {
       "post": {
         "tags": [
@@ -4054,10 +4142,6 @@
           "user": {
             "$ref": "#/components/schemas/UserBriefResponse"
           },
-          "createdAt": {
-            "type": "string",
-            "format": "date-time"
-          },
           "oldValue": {
             "type": "string",
             "nullable": true
@@ -4065,6 +4149,76 @@
           "newValue": {
             "type": "string",
             "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ActivityLogResponsePagedResult": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ActivityLogResponse"
+            },
+            "nullable": true
+          },
+          "totalCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageNumber": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "totalPages": {
+            "type": "integer",
+            "format": "int32",
+            "readOnly": true
+          },
+          "hasPrevious": {
+            "type": "boolean",
+            "readOnly": true
+          },
+          "hasNext": {
+            "type": "boolean",
+            "readOnly": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "ActivityLogResponsePagedResultApiResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string",
+            "nullable": true
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          },
+          "statusCode": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/ActivityLogResponsePagedResult"
           }
         },
         "additionalProperties": false
@@ -4124,14 +4278,19 @@
       },
       "AddProjectMemberRequest": {
         "required": [
-          "role",
-          "userId"
+          "role"
         ],
         "type": "object",
         "properties": {
           "userId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "nullable": true
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "nullable": true
           },
           "role": {
             "minLength": 1,
@@ -6386,6 +6545,10 @@
             "type": "string",
             "format": "date-time"
           },
+          "projectId": {
+            "type": "string",
+            "format": "uuid"
+          },
           "totalTasksCount": {
             "type": "integer",
             "format": "int32"
@@ -6754,6 +6917,10 @@
             "type": "string",
             "format": "date-time"
           },
+          "projectId": {
+            "type": "string",
+            "format": "uuid"
+          },
           "totalTasksCount": {
             "type": "integer",
             "format": "int32"
@@ -6906,7 +7073,6 @@
       },
       "StartSprintRequest": {
         "required": [
-          "backlogItemIds",
           "sprintId"
         ],
         "type": "object",
@@ -6920,7 +7086,8 @@
             "items": {
               "type": "string",
               "format": "uuid"
-            }
+            },
+            "nullable": true
           }
         },
         "additionalProperties": false
