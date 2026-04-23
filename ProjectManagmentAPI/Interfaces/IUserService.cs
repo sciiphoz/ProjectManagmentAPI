@@ -17,7 +17,8 @@ namespace ProjectManagementAPI.Interfaces
         Task<ApiResponse<AuthResponse>> RefreshTokenAsync(string refreshToken);
         Task<ApiResponse> ConfirmEmailAsync(string token, string email);
         Task<ApiResponse> ForgotPasswordAsync(string email);
-        Task<ApiResponse> ResetPasswordAsync(ResetPasswordRequest request);
+        Task<ApiResponse> VerifyResetCodeAsync(string email, string code);
+        Task<ApiResponse> ResetPasswordWithCodeAsync(string email, string code, string newPassword);
 
         // Управление пользователями
         Task<ApiResponse<UserResponse>> GetUserByIdAsync(Guid userId);

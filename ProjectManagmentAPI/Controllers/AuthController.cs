@@ -115,7 +115,7 @@ namespace ProjectManagementAPI.Controllers
 
         [HttpPost("forgot-password")]
         [AllowAnonymous]
-        public async Task<ActionResult<ApiResponse>> ForgotPassword(ForgotPasswordRequest request)
+        public async Task<ActionResult<ApiResponse>> ForgotPassword([FromBody] ForgotPasswordRequest request)
         {
             try
             {
@@ -129,18 +129,44 @@ namespace ProjectManagementAPI.Controllers
             }
         }
 
-        [HttpPost("reset-password")]
+        [HttpPost("verify-reset-code")]
         [AllowAnonymous]
-        public async Task<ActionResult<ApiResponse>> ResetPassword(ResetPasswordRequest request)
+        public async Task<ActionResult<ApiResponse>> VerifyResetCode([FromBody] VerifyCodeRequest request)
         {
             try
             {
-                var response = await _userService.ResetPasswordAsync(request);
-                return response.Success ? Ok(response) : BadRequest(response);
+                var response = await _userService.VerifyResetCodeAsync(request.Email, request.Code);
+                return Ok(response);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Ошибка при сбросе пароля");
+                _logger.LogError(ex, "Ошибка проверки кода");
+                return StatusCode(500, ApiResponse.Fail("Внутренняя ошибка сервера"));
+            }
+        }
+
+        [HttpPost("reset-password-with-code")]
+        [AllowAnonymous]
+        public async Task<ActionResult<ApiResponse>> ResetPasswordWithCode([FromBody] ResetPasswordWithCodeRequest request)
+        {
+            try
+            {
+                if (!ModelState.IsValid)
+                {
+                    return BadRequest(ApiResponse.Fail("Неверные данные"));
+                }
+
+                if (request.NewPassword != request.ConfirmNewPassword)
+                {
+                    return BadRequest(ApiResponse.Fail("Пароли не совпадают"));
+                }
+
+                var response = await _userService.ResetPasswordWithCodeAsync(request.Email, request.Code, request.NewPassword);
+                return Ok(response);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Ошибка сброса пароля");
                 return StatusCode(500, ApiResponse.Fail("Внутренняя ошибка сервера"));
             }
         }

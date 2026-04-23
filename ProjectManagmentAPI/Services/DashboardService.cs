@@ -14,10 +14,12 @@ namespace ProjectManagementAPI.Services
     public class DashboardService : BaseService, IDashboardService
     {
         private readonly ContextDb _context;
+        private readonly INotificationService _notificationService;
 
-        public DashboardService(ContextDb context, ILogger<DashboardService> logger) : base(logger)
+        public DashboardService(ContextDb context, ILogger<DashboardService> logger, INotificationService notificationService) : base(logger)
         {
             _context = context;
+            _notificationService = notificationService;
         }
 
         public async Task<ApiResponse<PersonalDashboardResponse>> GetPersonalDashboardAsync(Guid userId, DashboardRequest? request = null)
@@ -154,6 +156,42 @@ namespace ProjectManagementAPI.Services
                     OverdueTasks = overdueTasks,
                     Notifications = new List<NotificationResponse>()
                 };
+
+                var activeSprints = await _context.Sprints
+                    .Include(s => s.Project)
+                    .Where(s => s.IsActive && s.EndDate > DateTime.UtcNow && s.EndDate <= DateTime.UtcNow.AddDays(3))
+                    .ToListAsync();
+
+                foreach (var sprint in activeSprints)
+                {
+                    var daysRemaining = (sprint.EndDate - DateTime.UtcNow.Date).Days;
+
+                    var members = await _context.ProjectMembers
+                        .Where(pm => pm.ProjectId == sprint.ProjectId)
+                        .Select(pm => pm.UserId)
+                        .ToListAsync();
+
+                    foreach (var memberId in members)
+                    {
+                        var existingNotification = await _context.Notifications
+                            .AnyAsync(n => n.UserId == memberId &&
+                                           n.RelatedEntityId == sprint.Id &&
+                                           n.CreatedAt.Date == DateTime.UtcNow.Date);
+
+                        if (!existingNotification)
+                        {
+                            await _notificationService.CreateNotificationAsync(
+                                memberId,
+                                "Приближается дедлайн спринта",
+                                $"Спринт '{sprint.Name}' в проекте '{sprint.Project.Name}' заканчивается через {daysRemaining} дней",
+                                "Warning",
+                                $"/sprints/{sprint.Id}",
+                                sprint.Id,
+                                "Sprint"
+                            );
+                        }
+                    }
+                }
 
                 return ApiResponse<PersonalDashboardResponse>.Ok(response);
             }

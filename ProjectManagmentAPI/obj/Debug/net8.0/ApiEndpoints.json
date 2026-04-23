@@ -207,15 +207,41 @@
   },
   {
     "ContainingType": "ProjectManagementAPI.Controllers.AuthController",
-    "Method": "ResetPassword",
-    "RelativePath": "api/Auth/reset-password",
+    "Method": "ResetPasswordWithCode",
+    "RelativePath": "api/Auth/reset-password-with-code",
     "HttpMethod": "POST",
     "IsController": true,
     "Order": 0,
     "Parameters": [
       {
         "Name": "request",
-        "Type": "ProjectManagementAPI.DTO.Requests.ResetPasswordRequest",
+        "Type": "ProjectManagementAPI.DTO.Requests.ResetPasswordWithCodeRequest",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": [
+      {
+        "Type": "ProjectManagementAPI.DTO.Common.ApiResponse",
+        "MediaTypes": [
+          "text/plain",
+          "application/json",
+          "text/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
+  },
+  {
+    "ContainingType": "ProjectManagementAPI.Controllers.AuthController",
+    "Method": "VerifyResetCode",
+    "RelativePath": "api/Auth/verify-reset-code",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "request",
+        "Type": "ProjectManagementAPI.DTO.Requests.VerifyCodeRequest",
         "IsRequired": true
       }
     ],

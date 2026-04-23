@@ -93,7 +93,7 @@ namespace ProjectManagementAPI.Services
                     .Include(pm => pm.Project)
                         .ThenInclude(p => p.Owner)
                     .Select(pm => pm.Project)
-                    .Where(p => !p.IsArchived);
+                    .AsQueryable();
 
                 if (!string.IsNullOrWhiteSpace(request.SearchTerm))
                 {
@@ -327,7 +327,6 @@ namespace ProjectManagementAPI.Services
                 _context.ProjectMembers.Add(member);
                 await _context.SaveChangesAsync();
 
-                // Отправляем уведомление
                 await _notificationService.CreateNotificationAsync(
                     user.Id,
                     "Приглашение в проект",

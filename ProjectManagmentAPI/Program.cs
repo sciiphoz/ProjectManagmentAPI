@@ -62,6 +62,7 @@ builder.Services.AddScoped<IReportService, ReportService>();
 builder.Services.AddScoped<IRetrospectiveService, RetrospectiveService>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddScoped<IPasswordHasher, PasswordHasher>();
+builder.Services.AddScoped<IEmailService, EmailService>();
 
 // CORS Configuration
 builder.Services.AddCors(options =>

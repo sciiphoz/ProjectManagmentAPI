@@ -67,6 +67,32 @@ namespace ProjectManagementAPI.Services
 
                 await _context.SaveChangesAsync();
 
+                if (backlogItem.AssigneeId.HasValue)
+                {
+                    await _notificationService.CreateNotificationAsync(
+                        backlogItem.AssigneeId.Value,
+                        "Создана подзадача",
+                        $"Для задачи '{backlogItem.Title}' создана подзадача '{subTask.Title}'",
+                        "Info",
+                        $"/backlog/{backlogItem.Id}",
+                        backlogItem.Id,
+                        "BacklogItem"
+                    );
+                }
+
+                if (request.AssigneeId.HasValue && request.AssigneeId != backlogItem.AssigneeId)
+                {
+                    await _notificationService.CreateNotificationAsync(
+                        request.AssigneeId.Value,
+                        "Назначена подзадача",
+                        $"Вам назначена подзадача '{subTask.Title}' для задачи '{backlogItem.Title}'",
+                        "Info",
+                        $"/backlog/{backlogItem.Id}",
+                        backlogItem.Id,
+                        "BacklogItem"
+                    );
+                }
+
                 var response = await MapToSubTaskResponse(subTask);
                 return ApiResponse<SubTaskResponse>.Ok(response, "Подзадача создана");
             }

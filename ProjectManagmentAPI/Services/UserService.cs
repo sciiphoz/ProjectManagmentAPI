@@ -1,5 +1,4 @@
 ﻿using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
 using ProjectManagementAPI.DataBaseContext;
 using ProjectManagementAPI.DTO.Common;
@@ -21,16 +20,19 @@ namespace ProjectManagementAPI.Services
         private readonly ContextDb _context;
         private readonly IConfiguration _configuration;
         private readonly IPasswordHasher _passwordHasher;
+        private readonly IEmailService _emailService;
 
         public UserService(
             ContextDb context,
             IConfiguration configuration,
             IPasswordHasher passwordHasher,
-            ILogger<UserService> logger) : base(logger)
+            ILogger<UserService> logger,
+            IEmailService emailService) : base(logger)
         {
             _context = context;
             _configuration = configuration;
             _passwordHasher = passwordHasher;
+            _emailService = emailService;
         }
 
         public async Task<ApiResponse<AuthResponse>> RegisterAsync(RegisterRequest request)
@@ -78,14 +80,19 @@ namespace ProjectManagementAPI.Services
                 var user = await _context.Users
                     .FirstOrDefaultAsync(u => u.Username == request.UsernameOrEmail || u.Email == request.UsernameOrEmail);
 
-                if (user == null || !_passwordHasher.VerifyPassword(user.PasswordHash, request.Password))
+                if (user == null)
                 {
-                    return ApiResponse<AuthResponse>.Fail("Неверный логин или пароль");
+                    return ApiResponse<AuthResponse>.Fail("Пользователь с таким логином или email не зарегистрирован");
+                }
+
+                if (!_passwordHasher.VerifyPassword(user.PasswordHash, request.Password))
+                {
+                    return ApiResponse<AuthResponse>.Fail("Неверный пароль");
                 }
 
                 if (!user.IsActive)
                 {
-                    return ApiResponse<AuthResponse>.Fail("Учетная запись деактивирована");
+                    return ApiResponse<AuthResponse>.Fail("Учетная запись деактивирована. Обратитесь к администратору.");
                 }
 
                 var authResponse = await GenerateAuthResponse(user);
@@ -94,7 +101,7 @@ namespace ProjectManagementAPI.Services
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Ошибка входа пользователя {Username}", request.UsernameOrEmail);
-                return ApiResponse<AuthResponse>.Fail("Произошла ошибка при входе. Попробуйте позже.");
+                return ApiResponse<AuthResponse>.Fail("Произошла внутренняя ошибка. Попробуйте позже.");
             }
         }
 
@@ -172,48 +179,81 @@ namespace ProjectManagementAPI.Services
                 var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == email);
                 if (user == null)
                 {
-                    return ApiResponse.Ok("Если пользователь существует, инструкции отправлены на email");
+                    return ApiResponse.Ok("Если пользователь существует, код отправлен на email");
                 }
 
-                user.PasswordResetToken = GeneratePasswordResetToken();
-                user.PasswordResetTokenExpiry = DateTime.UtcNow.AddHours(24);
+                var code = GeneratePasswordResetCode();
+                user.PasswordResetCode = code;
+                user.PasswordResetCodeExpiry = DateTime.UtcNow.AddMinutes(15);
                 await _context.SaveChangesAsync();
 
-                return ApiResponse.Ok("Инструкции по сбросу пароля отправлены на email");
+                // Отправляем код на email
+                await _emailService.SendPasswordResetCodeAsync(user.Email, code);
+
+                return ApiResponse.Ok("Код подтверждения отправлен на email");
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Ошибка сброса пароля для {Email}", email);
-                return ApiResponse.Fail("Произошла ошибка при обработке запроса");
+                _logger.LogError(ex, "Ошибка при запросе сброса пароля для {Email}", email);
+                return ApiResponse.Fail("Произошла ошибка при отправке письма. Попробуйте позже.");
             }
         }
 
-        public async Task<ApiResponse> ResetPasswordAsync(ResetPasswordRequest request)
+        public async Task<ApiResponse> VerifyResetCodeAsync(string email, string code)
         {
             try
             {
                 var user = await _context.Users
-                    .FirstOrDefaultAsync(u => u.Email == request.Email &&
-                                              u.PasswordResetToken == request.Token &&
-                                              u.PasswordResetTokenExpiry > DateTime.UtcNow);
+                    .FirstOrDefaultAsync(u => u.Email == email &&
+                                              u.PasswordResetCode == code &&
+                                              u.PasswordResetCodeExpiry > DateTime.UtcNow);
 
                 if (user == null)
                 {
-                    return ApiResponse.Fail("Недействительная или просроченная ссылка сброса пароля");
+                    return ApiResponse.Fail("Неверный или просроченный код подтверждения");
                 }
 
-                user.PasswordHash = _passwordHasher.HashPassword(request.NewPassword);
-                user.PasswordResetToken = null;
-                user.PasswordResetTokenExpiry = null;
+                return ApiResponse.Ok("Код подтвержден");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Ошибка проверки кода для {Email}", email);
+                return ApiResponse.Fail("Произошла ошибка");
+            }
+        }
+
+        public async Task<ApiResponse> ResetPasswordWithCodeAsync(string email, string code, string newPassword)
+        {
+            try
+            {
+                var user = await _context.Users
+                    .FirstOrDefaultAsync(u => u.Email == email &&
+                                              u.PasswordResetCode == code &&
+                                              u.PasswordResetCodeExpiry > DateTime.UtcNow);
+
+                if (user == null)
+                {
+                    return ApiResponse.Fail("Неверный или просроченный код подтверждения");
+                }
+
+                user.PasswordHash = _passwordHasher.HashPassword(newPassword);
+                user.PasswordResetCode = null;
+                user.PasswordResetCodeExpiry = null;
                 await _context.SaveChangesAsync();
 
                 return ApiResponse.Ok("Пароль успешно изменен");
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Ошибка сброса пароля для {Email}", request.Email);
+                _logger.LogError(ex, "Ошибка сброса пароля для {Email}", email);
                 return ApiResponse.Fail("Произошла ошибка при сбросе пароля");
             }
+        }
+
+        private string GeneratePasswordResetCode()
+        {
+            var random = new Random();
+            return random.Next(100000, 999999).ToString();
         }
 
         public async Task<ApiResponse<UserResponse>> GetUserByIdAsync(Guid userId)
@@ -425,11 +465,6 @@ namespace ProjectManagementAPI.Services
         }
 
         private string GenerateEmailConfirmationToken()
-        {
-            return Convert.ToBase64String(Guid.NewGuid().ToByteArray());
-        }
-
-        private string GeneratePasswordResetToken()
         {
             return Convert.ToBase64String(Guid.NewGuid().ToByteArray());
         }

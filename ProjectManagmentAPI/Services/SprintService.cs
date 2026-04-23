@@ -203,14 +203,12 @@ namespace ProjectManagementAPI.Services
                     return ApiResponse<SprintResponse>.Fail("Спринт уже активен");
                 }
 
-                // Исправленная проверка статуса - сравниваем с числовым значением
                 if (sprint.Status != SprintStatus.Planned)
                 {
                     _logger.LogWarning($"Спринт {sprint.Id} имеет статус {sprint.Status}, ожидался Planned");
                     return ApiResponse<SprintResponse>.Fail($"Спринт можно запустить только в статусе Planned. Текущий статус: {sprint.Status}");
                 }
 
-                // Обновляем статус задач
                 if (request.BacklogItemIds != null && request.BacklogItemIds.Any())
                 {
                     for (int i = 0; i < request.BacklogItemIds.Count; i++)
@@ -234,6 +232,16 @@ namespace ProjectManagementAPI.Services
                 sprint.CommittedStoryPoints = (int)totalStoryPoints;
 
                 await _context.SaveChangesAsync();
+
+                await _notificationService.NotifyProjectMembersAsync(
+                    sprint.ProjectId,
+                    "Спринт начат",
+                    $"Спринт '{sprint.Name}' начат. Запланировано {request.BacklogItemIds.Count} задач",
+                    "Info",
+                    $"/sprints/{sprint.Id}",
+                    sprint.Id,
+                    "Sprint"
+                );
 
                 var response = await MapToSprintResponse(sprint);
                 return ApiResponse<SprintResponse>.Ok(response, "Спринт запущен");
@@ -265,14 +273,12 @@ namespace ProjectManagementAPI.Services
 
                 _logger.LogInformation($"Завершение спринта {sprint.Id}. Всего задач: {sprint.BacklogItems.Count}");
 
-                // Подсчет выполненных Story Points
                 var completedStoryPoints = sprint.BacklogItems
                     .Where(bi => bi.Status == BacklogItemStatus.Done)
                     .Sum(bi => bi.StoryPoints ?? 0);
 
                 _logger.LogInformation($"Выполнено Story Points: {completedStoryPoints}");
 
-                // Перенос незавершенных задач обратно в бэклог
                 var incompleteTasks = sprint.BacklogItems.Where(bi => bi.Status != BacklogItemStatus.Done).ToList();
                 _logger.LogInformation($"Незавершенных задач: {incompleteTasks.Count}");
 
@@ -290,7 +296,6 @@ namespace ProjectManagementAPI.Services
                 sprint.ReviewNotes = request.ReviewNotes;
                 sprint.RetrospectiveNotes = request.RetrospectiveNotes;
 
-                // Сохраняем Velocity
                 var velocity = new SprintVelocity
                 {
                     Id = Guid.NewGuid(),
@@ -306,7 +311,15 @@ namespace ProjectManagementAPI.Services
                 _context.SprintVelocities.Add(velocity);
                 await _context.SaveChangesAsync();
 
-                _logger.LogInformation($"Спринт {sprint.Id} успешно завершен. Velocity: {completedStoryPoints}");
+                await _notificationService.NotifyProjectMembersAsync(
+                    sprint.ProjectId,
+                    "Спринт завершен",
+                    $"Спринт '{sprint.Name}' завершен. Выполнено {completedStoryPoints} из {sprint.CommittedStoryPoints} Story Points. Velocity команды: {completedStoryPoints}",
+                    "Success",
+                    $"/sprints/{sprint.Id}",
+                    sprint.Id,
+                    "Sprint"
+                );
 
                 var response = await MapToSprintResponse(sprint);
                 return ApiResponse<SprintResponse>.Ok(response, "Спринт завершен");

@@ -122,11 +122,15 @@ namespace ProjectManagementAPI.Services
 
         public async Task<ApiResponse<BacklogItemResponse>> UpdateBacklogItemAsync(Guid id, UpdateBacklogItemRequest request)
         {
-            var backlogItem = await _context.BacklogItems.FindAsync(id);
+            var backlogItem = await _context.BacklogItems.Include(bi => bi.Project).FirstOrDefaultAsync(bi => bi.Id == id);
+
             if (backlogItem == null)
             {
                 return ApiResponse<BacklogItemResponse>.Fail("Задача не найдена");
             }
+
+            var oldAssigneeId = backlogItem.AssigneeId;
+            var project = backlogItem.Project;
 
             var oldValues = new
             {
@@ -193,6 +197,19 @@ namespace ProjectManagementAPI.Services
                 CreatedAt = DateTime.UtcNow
             });
 
+            if (request.AssigneeId.HasValue && oldAssigneeId != request.AssigneeId.Value)
+            {
+                await _notificationService.CreateNotificationAsync(
+                    request.AssigneeId.Value,
+                    "Назначена задача",
+                    $"Вам назначена задача '{backlogItem.Title}' в проекте '{project.Name}'",
+                    "Info",
+                    $"/backlog/{backlogItem.Id}",
+                    backlogItem.Id,
+                    "BacklogItem"
+                );
+            }
+
             await _context.SaveChangesAsync();
 
             var response = await MapToBacklogItemResponse(backlogItem);
@@ -241,6 +258,43 @@ namespace ProjectManagementAPI.Services
 
             backlogItem.UpdatedAt = DateTime.UtcNow;
             await _context.SaveChangesAsync();
+
+            if (request.NewStatus == BacklogItemStatus.Done && oldStatus != BacklogItemStatus.Done)
+            {
+                if (backlogItem.CreatedById != backlogItem.AssigneeId)
+                {
+                    await _notificationService.CreateNotificationAsync(
+                        backlogItem.CreatedById,
+                        "Задача выполнена",
+                        $"Задача '{backlogItem.Title}' выполнена {(backlogItem.Assignee != null ? $"пользователем {backlogItem.Assignee.FullName}" : "")}",
+                        "Success",
+                        $"/backlog/{backlogItem.Id}",
+                        backlogItem.Id,
+                        "BacklogItem"
+                    );
+                }
+
+                var scrumMasters = await _context.ProjectMembers
+                    .Where(pm => pm.ProjectId == backlogItem.ProjectId && pm.RoleInProject == ProjectRole.ScrumMaster)
+                    .Select(pm => pm.UserId)
+                    .ToListAsync();
+
+                foreach (var scrumMasterId in scrumMasters)
+                {
+                    if (scrumMasterId != backlogItem.AssigneeId && scrumMasterId != backlogItem.CreatedById)
+                    {
+                        await _notificationService.CreateNotificationAsync(
+                            scrumMasterId,
+                            "Задача выполнена",
+                            $"Задача '{backlogItem.Title}' в проекте выполнена",
+                            "Success",
+                            $"/backlog/{backlogItem.Id}",
+                            backlogItem.Id,
+                            "BacklogItem"
+                        );
+                    }
+                }
+            }
 
             _context.ActivityLogs.Add(new ActivityLog
             {

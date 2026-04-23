@@ -40,11 +40,11 @@ namespace ProjectManagementAPI.Models
         [Required]
         public bool IsActive { get; set; } = true;
 
-        public string? RefreshToken { get; set; }            
-        public DateTime? RefreshTokenExpiryTime { get; set; } 
-        public string? EmailConfirmationToken { get; set; }   
-        public DateTime? EmailConfirmedAt { get; set; }       
-        public string? PasswordResetToken { get; set; }       
+        public string? RefreshToken { get; set; }
+        public DateTime? RefreshTokenExpiryTime { get; set; }
+        public string? EmailConfirmationToken { get; set; }
+        public DateTime? EmailConfirmedAt { get; set; }
+        public string? PasswordResetToken { get; set; }
         public DateTime? PasswordResetTokenExpiry { get; set; }
 
         [InverseProperty("Owner")]
@@ -76,5 +76,8 @@ namespace ProjectManagementAPI.Models
 
         [InverseProperty("User")]
         public virtual ICollection<DailyUserTask> DailyTasks { get; set; } = new List<DailyUserTask>();
+
+        public string? PasswordResetCode { get; set; }
+        public DateTime? PasswordResetCodeExpiry { get; set; }
     }
 }

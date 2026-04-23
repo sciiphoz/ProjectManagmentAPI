@@ -362,7 +362,7 @@
         }
       }
     },
-    "/api/Auth/reset-password": {
+    "/api/Auth/verify-reset-code": {
       "post": {
         "tags": [
           "Auth"
@@ -371,17 +371,65 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ResetPasswordRequest"
+                "$ref": "#/components/schemas/VerifyCodeRequest"
               }
             },
             "text/json": {
               "schema": {
-                "$ref": "#/components/schemas/ResetPasswordRequest"
+                "$ref": "#/components/schemas/VerifyCodeRequest"
               }
             },
             "application/*+json": {
               "schema": {
-                "$ref": "#/components/schemas/ResetPasswordRequest"
+                "$ref": "#/components/schemas/VerifyCodeRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/Auth/reset-password-with-code": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResetPasswordWithCodeRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResetPasswordWithCodeRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResetPasswordWithCodeRequest"
               }
             }
           }
@@ -6338,23 +6386,23 @@
         "type": "integer",
         "format": "int32"
       },
-      "ResetPasswordRequest": {
+      "ResetPasswordWithCodeRequest": {
         "required": [
+          "code",
           "confirmNewPassword",
           "email",
-          "newPassword",
-          "token"
+          "newPassword"
         ],
         "type": "object",
         "properties": {
-          "token": {
-            "minLength": 1,
-            "type": "string"
-          },
           "email": {
             "minLength": 1,
             "type": "string",
             "format": "email"
+          },
+          "code": {
+            "minLength": 1,
+            "type": "string"
           },
           "newPassword": {
             "minLength": 6,
@@ -7983,6 +8031,25 @@
           },
           "data": {
             "$ref": "#/components/schemas/VelocityReportResponse"
+          }
+        },
+        "additionalProperties": false
+      },
+      "VerifyCodeRequest": {
+        "required": [
+          "code",
+          "email"
+        ],
+        "type": "object",
+        "properties": {
+          "email": {
+            "minLength": 1,
+            "type": "string",
+            "format": "email"
+          },
+          "code": {
+            "minLength": 1,
+            "type": "string"
           }
         },
         "additionalProperties": false
