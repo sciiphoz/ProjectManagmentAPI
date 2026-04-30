@@ -24,10 +24,5 @@ namespace ProjectManagementAPI.Interfaces
         /// Генерация Velocity отчета
         /// </summary>
         Task<ApiResponse<VelocityReportResponse>> GenerateVelocityReportAsync(Guid projectId, int lastSprintsCount = 5);
-
-        /// <summary>
-        /// Экспорт отчета в файл
-        /// </summary>
-        Task<byte[]> ExportReportAsync(GenerateReportRequest request);
     }
 }

@@ -177,9 +177,10 @@ namespace ProjectManagementAPI.Services
                         TotalStoryPointsCompleted = (int)completedTasks.Sum(t => t.StoryPoints ?? 0),
                         TotalEstimatedHours = memberTasks.Sum(t => t.EstimatedHours ?? 0),
                         TotalActualHours = memberTasks.Sum(t => t.ActualHours ?? 0),
-                        Efficiency = memberTasks.Sum(t => t.EstimatedHours ?? 0) > 0
-                            ? (double)(memberTasks.Sum(t => t.EstimatedHours ?? 0) / (memberTasks.Sum(t => t.ActualHours ?? 0) + 0.01m)) * 100
-                            : 0,
+                        Efficiency = memberTasks.Any(t => t.EstimatedHours > 0)
+                            ? (double)(memberTasks.Where(t => t.Status == BacklogItemStatus.Done).Sum(t => t.EstimatedHours ?? 0))
+                              / (double)(memberTasks.Where(t => t.Status == BacklogItemStatus.Done).Sum(t => t.ActualHours ?? 0) + 0.01m) * 100
+                            : 100,
                         CompletionRate = memberTasks.Any()
                             ? (double)completedTasks.Count / memberTasks.Count * 100
                             : 0,
@@ -202,8 +203,10 @@ namespace ProjectManagementAPI.Services
                     TotalStoryPointsCompleted = teamMembersPerformance.Sum(m => m.TotalStoryPointsCompleted),
                     TotalEstimatedHours = teamMembersPerformance.Sum(m => m.TotalEstimatedHours),
                     TotalActualHours = teamMembersPerformance.Sum(m => m.TotalActualHours),
-                    OverallEfficiency = teamMembersPerformance.Any()
-                        ? teamMembersPerformance.Average(m => m.Efficiency)
+                    OverallEfficiency = teamMembersPerformance.Any(m => m.TotalEstimatedHours > 0)
+                        ? teamMembersPerformance
+                            .Where(m => m.TotalEstimatedHours > 0)
+                            .Average(m => m.Efficiency)
                         : 0,
                     AverageTasksPerMember = teamMembersPerformance.Any()
                         ? teamMembersPerformance.Average(m => m.TasksCompleted)
@@ -282,73 +285,5 @@ namespace ProjectManagementAPI.Services
                 return ApiResponse<VelocityReportResponse>.Fail("Произошла ошибка при формировании отчета");
             }
         }
-
-        public async Task<byte[]> ExportReportAsync(GenerateReportRequest request)
-        {
-            try
-            {
-                object reportData = request.Type switch
-                {
-                    ReportType.SprintReport when request.SprintId.HasValue =>
-                        await GenerateSprintReportAsync(request.SprintId.Value),
-                    ReportType.TeamPerformance =>
-                        await GenerateTeamPerformanceReportAsync(request),
-                    ReportType.VelocityReport =>
-                        await GenerateVelocityReportAsync(request.ProjectId),
-                    _ => await GenerateSprintReportAsync(request.SprintId ?? Guid.Empty)
-                };
-
-                return request.Format switch
-                {
-                    ReportFormat.CSV => GenerateCsvReport(reportData),
-                    _ => GeneratePdfReport(reportData)
-                };
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Ошибка экспорта отчета");
-                return Array.Empty<byte>();
-            }
-        }
-
-        #region Private Methods
-
-        private byte[] GenerateCsvReport(object data)
-        {
-            try
-            {
-                var sb = new StringBuilder();
-
-                if (data is ApiResponse<SprintReportResponse> sprintReport && sprintReport.Data != null)
-                {
-                    sb.AppendLine("Sprint Report");
-                    sb.AppendLine($"Sprint: {sprintReport.Data.Sprint.Name}");
-                    sb.AppendLine($"Period: {sprintReport.Data.Sprint.StartDate:d} - {sprintReport.Data.Sprint.EndDate:d}");
-                    sb.AppendLine();
-                    sb.AppendLine("Completed Tasks:");
-                    sb.AppendLine("ID,Title,Type,Story Points,Estimated Hours,Actual Hours,Assignee,Completed At");
-
-                    foreach (var task in sprintReport.Data.CompletedTasks)
-                    {
-                        sb.AppendLine($"{task.Id},{task.Title},{task.Type},{task.StoryPoints},{task.EstimatedHours},{task.ActualHours},{task.Assignee?.FullName},{task.CompletedAt:d}");
-                    }
-                }
-
-                return Encoding.UTF8.GetBytes(sb.ToString());
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Ошибка генерации CSV отчета");
-                return Array.Empty<byte>();
-            }
-        }
-
-        private byte[] GeneratePdfReport(object data)
-        {
-            // Заглушка для PDF
-            return Array.Empty<byte>();
-        }
-
-        #endregion
     }
 }

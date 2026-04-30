@@ -1292,22 +1292,6 @@
   },
   {
     "ContainingType": "ProjectManagementAPI.Controllers.ReportsController",
-    "Method": "ExportReport",
-    "RelativePath": "api/Reports/export",
-    "HttpMethod": "POST",
-    "IsController": true,
-    "Order": 0,
-    "Parameters": [
-      {
-        "Name": "request",
-        "Type": "ProjectManagementAPI.DTO.Requests.GenerateReportRequest",
-        "IsRequired": true
-      }
-    ],
-    "ReturnTypes": []
-  },
-  {
-    "ContainingType": "ProjectManagementAPI.Controllers.ReportsController",
     "Method": "GenerateSprintReport",
     "RelativePath": "api/Reports/sprint/{sprintId}",
     "HttpMethod": "GET",

@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using ProjectManagementAPI.DTO.Common;
 using ProjectManagementAPI.DTO.Requests;
 using ProjectManagementAPI.DTO.Responses;
+using ProjectManagementAPI.Extensions;
 using ProjectManagementAPI.Interfaces;
 
 namespace ProjectManagementAPI.Controllers
@@ -118,7 +119,8 @@ namespace ProjectManagementAPI.Controllers
         [HttpPost("{backlogItemId}/comments")]
         public async Task<ActionResult<ApiResponse<CommentResponse>>> AddComment(Guid backlogItemId, AddCommentRequest request)
         {
-            var response = await _backlogService.AddCommentAsync(backlogItemId, request);
+            var userId = User.GetUserId(); 
+            var response = await _backlogService.AddCommentAsync(backlogItemId, request, userId);
             return Ok(response);
         }
 
@@ -128,7 +130,8 @@ namespace ProjectManagementAPI.Controllers
         [HttpPut("comments/{commentId}")]
         public async Task<ActionResult<ApiResponse<CommentResponse>>> UpdateComment(Guid commentId, UpdateCommentRequest request)
         {
-            var response = await _backlogService.UpdateCommentAsync(commentId, request);
+            var userId = User.GetUserId();
+            var response = await _backlogService.UpdateCommentAsync(commentId, request, userId);
             return Ok(response);
         }
 
@@ -138,7 +141,8 @@ namespace ProjectManagementAPI.Controllers
         [HttpDelete("comments/{commentId}")]
         public async Task<ActionResult<ApiResponse>> DeleteComment(Guid commentId)
         {
-            var response = await _backlogService.DeleteCommentAsync(commentId);
+            var userId = User.GetUserId();
+            var response = await _backlogService.DeleteCommentAsync(commentId, userId);
             return Ok(response);
         }
 

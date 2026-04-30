@@ -169,7 +169,7 @@ namespace ProjectManagementAPI.Services
                 backlogItem.Status = request.Status.Value;
 
             if (request.AssigneeId.HasValue)
-                backlogItem.AssigneeId = request.AssigneeId;
+                backlogItem.AssigneeId = request.AssigneeId.Value == Guid.Empty ? null : request.AssigneeId.Value;
 
             backlogItem.UpdatedAt = DateTime.UtcNow;
             await _context.SaveChangesAsync();
@@ -177,7 +177,7 @@ namespace ProjectManagementAPI.Services
             _context.ActivityLogs.Add(new ActivityLog
             {
                 ProjectId = backlogItem.ProjectId,
-                UserId = request.UserId,
+                UserId = request.UserId != Guid.Empty ? request.UserId : backlogItem.CreatedById,
                 ActionType = ActionType.TaskUpdated,
                 EntityType = "BacklogItem",
                 EntityId = backlogItem.Id,
@@ -197,7 +197,7 @@ namespace ProjectManagementAPI.Services
                 CreatedAt = DateTime.UtcNow
             });
 
-            if (request.AssigneeId.HasValue && oldAssigneeId != request.AssigneeId.Value)
+            if (request.AssigneeId.HasValue && request.AssigneeId.Value != Guid.Empty && oldAssigneeId != request.AssigneeId.Value)
             {
                 await _notificationService.CreateNotificationAsync(
                     request.AssigneeId.Value,
@@ -299,7 +299,7 @@ namespace ProjectManagementAPI.Services
             _context.ActivityLogs.Add(new ActivityLog
             {
                 ProjectId = backlogItem.ProjectId,
-                UserId = request.UserId,
+                UserId = request.UserId != Guid.Empty ? request.UserId : backlogItem.AssigneeId ?? backlogItem.CreatedById,
                 ActionType = ActionType.TaskStatusChanged,
                 EntityType = "BacklogItem",
                 EntityId = backlogItem.Id,
@@ -328,69 +328,65 @@ namespace ProjectManagementAPI.Services
             return ApiResponse.Ok("Порядок бэклога обновлен");
         }
 
-        public async Task<ApiResponse<CommentResponse>> AddCommentAsync(Guid backlogItemId, AddCommentRequest request)
+        public async Task<ApiResponse<CommentResponse>> AddCommentAsync(Guid backlogItemId, AddCommentRequest request, Guid userId)
         {
-            var backlogItem = await _context.BacklogItems.FindAsync(backlogItemId);
-            if (backlogItem == null)
+            try
             {
-                return ApiResponse<CommentResponse>.Fail("Задача не найдена");
-            }
+                var backlogItem = await _context.BacklogItems.FindAsync(backlogItemId);
+                if (backlogItem == null)
+                    return ApiResponse<CommentResponse>.Fail("Задача не найдена");
 
-            var comment = new Comment
-            {
-                Id = Guid.NewGuid(),
-                BacklogItemId = backlogItemId,
-                UserId = request.UserId,
-                Content = request.Content,
-                MentionedUsers = request.MentionedUserIds != null && request.MentionedUserIds.Any()
-                    ? JsonSerializer.Serialize(request.MentionedUserIds)
-                    : null,
-                CreatedAt = DateTime.UtcNow
-            };
-
-            _context.Comments.Add(comment);
-            await _context.SaveChangesAsync();
-
-            if (request.MentionedUserIds != null)
-            {
-                foreach (var mentionedUserId in request.MentionedUserIds)
+                var comment = new Comment
                 {
-                    await _notificationService.CreateNotificationAsync(
-                        mentionedUserId,
-                        "Вас упомянули в комментарии",
-                        $"{request.UserName} упомянул вас в комментарии к задаче '{backlogItem.Title}'",
-                        "Info",
-                        $"/backlog/{backlogItemId}",
-                        backlogItemId,
-                        "BacklogItem"
-                    );
-                }
-            }
+                    Id = Guid.NewGuid(),
+                    BacklogItemId = backlogItemId,
+                    UserId = userId, // ← получаем из JWT, а не из запроса
+                    Content = request.Content,
+                    CreatedAt = DateTime.UtcNow
+                };
 
-            var response = new CommentResponse
-            {
-                Id = comment.Id,
-                Content = comment.Content,
-                User = new UserBriefResponse
+                _context.Comments.Add(comment);
+                await _context.SaveChangesAsync();
+
+                var user = await _context.Users.FindAsync(userId);
+
+                var response = new CommentResponse
                 {
-                    Id = request.UserId,
-                    FullName = request.UserName,
-                    Username = request.UserLogin
-                },
-                MentionedUsers = request.MentionedUserIds?.Select(id => new UserBriefResponse { Id = id }).ToList() ?? new List<UserBriefResponse>(),
-                CreatedAt = comment.CreatedAt,
-                IsEdited = false
-            };
+                    Id = comment.Id,
+                    Content = comment.Content,
+                    CreatedAt = comment.CreatedAt,
+                    User = new UserBriefResponse
+                    {
+                        Id = user.Id,
+                        FullName = user.FullName,
+                        Username = user.Username
+                    }
+                };
 
-            return ApiResponse<CommentResponse>.Ok(response, "Комментарий добавлен");
+                return ApiResponse<CommentResponse>.Ok(response);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Ошибка добавления комментария");
+                return ApiResponse<CommentResponse>.Fail("Ошибка сервера");
+            }
         }
 
-        public async Task<ApiResponse<CommentResponse>> UpdateCommentAsync(Guid commentId, UpdateCommentRequest request)
+        public async Task<ApiResponse<CommentResponse>> UpdateCommentAsync(Guid commentId, UpdateCommentRequest request, Guid userId)
         {
-            var comment = await _context.Comments.FindAsync(commentId);
+            var comment = await _context.Comments
+                .Include(c => c.User)
+                .FirstOrDefaultAsync(c => c.Id == commentId);
+
             if (comment == null)
             {
                 return ApiResponse<CommentResponse>.Fail("Комментарий не найден");
+            }
+
+            // Проверяем, что пользователь — автор комментария
+            if (comment.UserId != userId)
+            {
+                return ApiResponse<CommentResponse>.Fail("Вы не можете редактировать чужой комментарий");
             }
 
             comment.Content = request.Content;
@@ -398,16 +394,15 @@ namespace ProjectManagementAPI.Services
             comment.IsEdited = true;
             await _context.SaveChangesAsync();
 
-            var user = await _context.Users.FindAsync(comment.UserId);
             var response = new CommentResponse
             {
                 Id = comment.Id,
                 Content = comment.Content,
                 User = new UserBriefResponse
                 {
-                    Id = user!.Id,
-                    FullName = user.FullName,
-                    Username = user.Username
+                    Id = comment.User.Id,
+                    FullName = comment.User.FullName,
+                    Username = comment.User.Username
                 },
                 CreatedAt = comment.CreatedAt,
                 UpdatedAt = comment.UpdatedAt,
@@ -417,12 +412,17 @@ namespace ProjectManagementAPI.Services
             return ApiResponse<CommentResponse>.Ok(response, "Комментарий обновлен");
         }
 
-        public async Task<ApiResponse> DeleteCommentAsync(Guid commentId)
+        public async Task<ApiResponse> DeleteCommentAsync(Guid commentId, Guid userId)
         {
             var comment = await _context.Comments.FindAsync(commentId);
             if (comment == null)
             {
                 return ApiResponse.Fail("Комментарий не найден");
+            }
+
+            if (comment.UserId != userId)
+            {
+                return ApiResponse.Fail("Вы не можете удалить чужой комментарий");
             }
 
             _context.Comments.Remove(comment);

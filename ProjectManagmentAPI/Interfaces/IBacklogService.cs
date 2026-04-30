@@ -21,9 +21,9 @@ namespace ProjectManagementAPI.Interfaces
         Task<ApiResponse> ReorderBacklogAsync(ReorderBacklogRequest request);
 
         // Комментарии
-        Task<ApiResponse<CommentResponse>> AddCommentAsync(Guid backlogItemId, AddCommentRequest request);
-        Task<ApiResponse<CommentResponse>> UpdateCommentAsync(Guid commentId, UpdateCommentRequest request);
-        Task<ApiResponse> DeleteCommentAsync(Guid commentId);
+        Task<ApiResponse<CommentResponse>> AddCommentAsync(Guid backlogItemId, AddCommentRequest request, Guid userId);
+        Task<ApiResponse<CommentResponse>> UpdateCommentAsync(Guid commentId, UpdateCommentRequest request, Guid userId);
+        Task<ApiResponse> DeleteCommentAsync(Guid commentId, Guid userId);
 
         // Вложения
         Task<ApiResponse<AttachmentResponse>> UploadAttachmentAsync(Guid backlogItemId, UploadAttachmentRequest request);

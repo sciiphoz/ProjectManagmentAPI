@@ -2307,37 +2307,6 @@
         }
       }
     },
-    "/api/Reports/export": {
-      "post": {
-        "tags": [
-          "Reports"
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/GenerateReportRequest"
-              }
-            },
-            "text/json": {
-              "schema": {
-                "$ref": "#/components/schemas/GenerateReportRequest"
-              }
-            },
-            "application/*+json": {
-              "schema": {
-                "$ref": "#/components/schemas/GenerateReportRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "OK"
-          }
-        }
-      }
-    },
     "/api/Retrospective/sprint/{sprintId}": {
       "get": {
         "tags": [

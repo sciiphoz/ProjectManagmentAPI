@@ -53,32 +53,5 @@ namespace ProjectManagementAPI.Controllers
             var response = await _reportService.GenerateVelocityReportAsync(projectId, lastSprintsCount);
             return Ok(response);
         }
-
-        /// <summary>
-        /// Экспорт отчёта в файл
-        /// </summary>
-        [HttpPost("export")]
-        public async Task<IActionResult> ExportReport(GenerateReportRequest request)
-        {
-            var fileData = await _reportService.ExportReportAsync(request);
-
-            string extension = request.Format switch
-            {
-                ReportFormat.PDF => "pdf",
-                ReportFormat.Excel => "xlsx",
-                ReportFormat.CSV => "csv",
-                _ => "pdf"
-            };
-
-            string contentType = request.Format switch
-            {
-                ReportFormat.PDF => "application/pdf",
-                ReportFormat.Excel => "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                ReportFormat.CSV => "text/csv",
-                _ => "application/pdf"
-            };
-
-            return File(fileData, contentType, $"report_{DateTime.Now:yyyyMMdd_HHmmss}.{extension}");
-        }
     }
 }
