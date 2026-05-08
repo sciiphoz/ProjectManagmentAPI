@@ -39,6 +39,9 @@ namespace ProjectManagementAPI.DataBaseContext
                 .HasIndex(u => u.Email)
                 .IsUnique();
 
+            modelBuilder.Entity<ActivityLog>()
+                .HasIndex(al => new { al.EntityType, al.EntityId, al.CreatedAt });
+            
             modelBuilder.Entity<ProjectMember>()
                 .HasIndex(pm => new { pm.ProjectId, pm.UserId })
                 .IsUnique();

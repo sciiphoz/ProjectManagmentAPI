@@ -559,13 +559,6 @@ namespace ProjectManagementAPI.Services
                 .Include(bi => bi.Assignee)
                 .Include(bi => bi.CreatedBy)
                 .Include(bi => bi.Sprint)
-                .Include(bi => bi.SubTasks)
-                    .ThenInclude(st => st.Assignee)
-                .Include(bi => bi.Comments)
-                    .ThenInclude(c => c.User)
-                .Include(bi => bi.Attachments)
-                    .ThenInclude(a => a.UploadedBy)
-                .Include(bi => bi.Blockers)
                 .FirstOrDefaultAsync(bi => bi.Id == id);
 
             if (backlogItem == null)
@@ -573,10 +566,39 @@ namespace ProjectManagementAPI.Services
                 return ApiResponse<BacklogItemDetailResponse>.Fail("Задача не найдена");
             }
 
+            var subTasks = await _context.SubTasks
+                .Include(st => st.Assignee)
+                .Where(st => st.BacklogItemId == id)
+                .OrderBy(st => st.OrderInParent)
+                .ToListAsync();
+
+            var comments = await _context.Comments
+                .Include(c => c.User)
+                .Where(c => c.BacklogItemId == id)
+                .OrderBy(c => c.CreatedAt)
+                .Take(50)
+                .ToListAsync();
+
+            var attachments = await _context.Attachments
+                .Include(a => a.UploadedBy)
+                .Where(a => a.BacklogItemId == id)
+                .ToListAsync();
+
+            var blockers = await _context.Blockers
+                .Where(b => b.BacklogItemId == id && b.Status == BlockerStatus.Active)
+                .ToListAsync();
+
             var activityLogs = await _context.ActivityLogs
                 .Where(al => al.EntityId == id && al.EntityType == "BacklogItem")
                 .OrderByDescending(al => al.CreatedAt)
-                .Take(50)
+                .Take(20)
+                .Select(al => new ActivityLogResponse
+                {
+                    Id = al.Id,
+                    ActionType = al.ActionType.ToString(),
+                    Description = al.Description,
+                    CreatedAt = al.CreatedAt
+                })
                 .ToListAsync();
 
             var response = new BacklogItemDetailResponse
@@ -617,7 +639,7 @@ namespace ProjectManagementAPI.Services
                 SprintPriority = backlogItem.SprintPriority,
                 StartedAt = backlogItem.StartedAt,
                 ActualHours = backlogItem.ActualHours,
-                SubTasks = backlogItem.SubTasks.Select(st => new SubTaskResponse
+                SubTasks = subTasks.Select(st => new SubTaskResponse
                 {
                     Id = st.Id,
                     Title = st.Title,
@@ -644,7 +666,7 @@ namespace ProjectManagementAPI.Services
                         ? Math.Round((double)st.EstimatedHours.Value / (double)st.ActualHours.Value * 100, 1)
                         : null
                 }).ToList(),
-                Comments = backlogItem.Comments.Select(c => new CommentResponse
+                Comments = comments.Select(c => new CommentResponse
                 {
                     Id = c.Id,
                     Content = c.Content,
@@ -658,7 +680,7 @@ namespace ProjectManagementAPI.Services
                     UpdatedAt = c.UpdatedAt,
                     IsEdited = c.IsEdited
                 }).ToList(),
-                Attachments = backlogItem.Attachments.Select(a => new AttachmentResponse
+                Attachments = attachments.Select(a => new AttachmentResponse
                 {
                     Id = a.Id,
                     FileName = a.FileName,
@@ -673,27 +695,19 @@ namespace ProjectManagementAPI.Services
                     },
                     UploadedAt = a.UploadedAt
                 }).ToList(),
-                ActiveBlockers = backlogItem.Blockers
-                    .Where(b => b.Status == BlockerStatus.Active)
-                    .Select(b => new BlockerResponse
-                    {
-                        Id = b.Id,
-                        Description = b.Description,
-                        Severity = b.Severity.ToString(),
-                        Status = b.Status.ToString(),
-                        CreatedAt = b.CreatedAt
-                    }).ToList(),
-                ActivityHistory = activityLogs.Select(al => new ActivityLogResponse
+                ActiveBlockers = blockers.Select(b => new BlockerResponse
                 {
-                    Id = al.Id,
-                    ActionType = al.ActionType.ToString(),
-                    Description = al.Description,
-                    CreatedAt = al.CreatedAt
+                    Id = b.Id,
+                    Description = b.Description,
+                    Severity = b.Severity.ToString(),
+                    Status = b.Status.ToString(),
+                    CreatedAt = b.CreatedAt
                 }).ToList(),
-                SubTasksCount = backlogItem.SubTasks.Count,
-                CompletedSubTasksCount = backlogItem.SubTasks.Count(st => st.Status == SubTaskStatus.Done),
-                CommentsCount = backlogItem.Comments.Count,
-                AttachmentsCount = backlogItem.Attachments.Count
+                ActivityHistory = activityLogs,
+                SubTasksCount = subTasks.Count,
+                CompletedSubTasksCount = subTasks.Count(st => st.Status == SubTaskStatus.Done),
+                CommentsCount = comments.Count,
+                AttachmentsCount = attachments.Count
             };
 
             return ApiResponse<BacklogItemDetailResponse>.Ok(response);

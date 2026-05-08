@@ -370,12 +370,7 @@ namespace ProjectManagementAPI.Services
             try
             {
                 var sprint = await _context.Sprints
-                    .Include(s => s.BacklogItems)
-                        .ThenInclude(bi => bi.Assignee)
-                    .Include(s => s.BacklogItems)
-                        .ThenInclude(bi => bi.SubTasks)
-                    .Include(s => s.BacklogItems)
-                        .ThenInclude(bi => bi.Blockers)
+                    .Include(s => s.Project)
                     .FirstOrDefaultAsync(s => s.Id == sprintId);
 
                 if (sprint == null)
@@ -383,28 +378,29 @@ namespace ProjectManagementAPI.Services
                     return ApiResponse<SprintBoardResponse>.Fail("Спринт не найден");
                 }
 
-                var boardTasks = sprint.BacklogItems.Select(bi => new BacklogItemBoardResponse
-                {
-                    Id = bi.Id,
-                    Title = bi.Title,
-                    Type = bi.Type.ToString(),
-                    Status = bi.Status.ToString(),
-                    Priority = bi.Priority,
-                    StoryPoints = bi.StoryPoints,
-                    EstimatedHours = bi.EstimatedHours,
-                    Assignee = bi.Assignee != null ? new UserBriefResponse
+                // Загружаем задачи с минимальными связями через проекцию
+                var boardTasks = await _context.BacklogItems
+                    .Where(bi => bi.SprintId == sprintId)
+                    .Select(bi => new BacklogItemBoardResponse
                     {
-                        Id = bi.Assignee.Id,
-                        FullName = bi.Assignee.FullName,
-                        Username = bi.Assignee.Username
-                    } : null,
-                    HasBlockers = bi.Blockers.Any(b => b.Status == BlockerStatus.Active),
-                    SubTasksCount = bi.SubTasks.Count,
-                    CompletedSubTasksCount = bi.SubTasks.Count(st => st.Status == SubTaskStatus.Done)
-                }).ToList();
-
-                var metricsResult = await GetSprintMetricsAsync(sprintId);
-                var burndownResult = await GetBurndownChartAsync(sprintId);
+                        Id = bi.Id,
+                        Title = bi.Title,
+                        Type = bi.Type.ToString(),
+                        Status = bi.Status.ToString(),
+                        Priority = bi.Priority,
+                        StoryPoints = bi.StoryPoints,
+                        EstimatedHours = bi.EstimatedHours,
+                        Assignee = bi.Assignee != null ? new UserBriefResponse
+                        {
+                            Id = bi.Assignee.Id,
+                            FullName = bi.Assignee.FullName,
+                            Username = bi.Assignee.Username
+                        } : null,
+                        HasBlockers = bi.Blockers.Any(b => b.Status == BlockerStatus.Active),
+                        SubTasksCount = bi.SubTasks.Count,
+                        CompletedSubTasksCount = bi.SubTasks.Count(st => st.Status == SubTaskStatus.Done)
+                    })
+                    .ToListAsync();
 
                 var response = new SprintBoardResponse
                 {
@@ -417,28 +413,26 @@ namespace ProjectManagementAPI.Services
                     Status = sprint.Status.ToString(),
                     CreatedAt = sprint.CreatedAt,
                     ProjectId = sprint.ProjectId,
-                    TotalTasksCount = sprint.BacklogItems.Count,
-                    CompletedTasksCount = sprint.BacklogItems.Count(bi => bi.Status == BacklogItemStatus.Done),
-                    TotalStoryPoints = sprint.BacklogItems.Sum(bi => bi.StoryPoints),
-                    CompletedStoryPoints = sprint.BacklogItems.Where(bi => bi.Status == BacklogItemStatus.Done).Sum(bi => bi.StoryPoints),
-                    CompletionPercentage = sprint.BacklogItems.Any()
-                        ? (double)sprint.BacklogItems.Count(bi => bi.Status == BacklogItemStatus.Done) / sprint.BacklogItems.Count * 100
+                    ProjectOwnerId = sprint.Project.OwnerId,
+                    TotalTasksCount = boardTasks.Count,
+                    CompletedTasksCount = boardTasks.Count(t => t.Status == BacklogItemStatus.Done.ToString()),
+                    TotalStoryPoints = boardTasks.Sum(t => t.StoryPoints) ?? 0,
+                    CompletedStoryPoints = boardTasks.Where(t => t.Status == BacklogItemStatus.Done.ToString()).Sum(t => t.StoryPoints) ?? 0,
+                    CompletionPercentage = boardTasks.Any()
+                        ? (double)boardTasks.Count(t => t.Status == BacklogItemStatus.Done.ToString()) / boardTasks.Count * 100
                         : 0,
                     DaysRemaining = sprint.IsActive ? (sprint.EndDate - DateTime.UtcNow.Date).Days : 0,
                     Tasks = boardTasks,
-                    Metrics = metricsResult.Data ?? new SprintMetrics(),
-                    BurndownData = burndownResult.Data ?? new List<BurndownPoint>()
+                    Metrics = new SprintMetrics(),
+                    BurndownData = new List<BurndownPoint>()
                 };
-
-                // Добавим отладочный вывод
-                Console.WriteLine($"SprintBoardResponse создан: Id={response.Id}, ProjectId={response.ProjectId}");
 
                 return ApiResponse<SprintBoardResponse>.Ok(response);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Ошибка получения доски спринта {SprintId}", sprintId);
-                return ApiResponse<SprintBoardResponse>.Fail("Произошла ошибка при получении данных доски спринта");
+                return ApiResponse<SprintBoardResponse>.Fail("Ошибка при получении данных доски спринта");
             }
         }
 
@@ -457,6 +451,37 @@ namespace ProjectManagementAPI.Services
                     return ApiResponse.Fail("Неверный статус");
                 }
 
+                _logger.LogInformation($"Изменение статуса задачи {taskId}: {task.Status} -> {status}");
+
+                // Проверка для Done
+                if (status == BacklogItemStatus.Done)
+                {
+                    var subTasks = await _context.SubTasks
+                        .Where(st => st.BacklogItemId == taskId)
+                        .ToListAsync();
+
+                    var incompleteSubtasks = subTasks.Any(st => st.Status != SubTaskStatus.Done);
+                    _logger.LogInformation($"Подзадачи: {subTasks.Count}, незавершённые: {incompleteSubtasks}");
+
+                    if (subTasks.Any() && incompleteSubtasks)
+                    {
+                        _logger.LogWarning($"Нельзя завершить задачу {taskId}: есть незавершённые подзадачи");
+                        return ApiResponse.Fail("Нельзя завершить задачу, пока не выполнены все подзадачи");
+                    }
+
+                    var activeBlockers = await _context.Blockers
+                        .AnyAsync(b => b.BacklogItemId == taskId && b.Status == BlockerStatus.Active);
+                    _logger.LogInformation($"Активные блокеры: {activeBlockers}");
+
+                    if (activeBlockers)
+                    {
+                        _logger.LogWarning($"Нельзя завершить задачу {taskId}: есть активные блокеры");
+                        return ApiResponse.Fail("Нельзя завершить задачу, пока есть активные блокеры");
+                    }
+
+                    task.CompletedAt = DateTime.UtcNow;
+                }
+
                 var oldStatus = task.Status;
                 task.Status = status;
 
@@ -465,26 +490,13 @@ namespace ProjectManagementAPI.Services
                     task.StartedAt = DateTime.UtcNow;
                 }
 
-                if (status == BacklogItemStatus.Done && !task.CompletedAt.HasValue)
-                {
-                    var subTasks = await _context.SubTasks
-                        .Where(st => st.BacklogItemId == taskId)
-                        .ToListAsync();
-
-                    if (subTasks.Any() && subTasks.Any(st => st.Status != SubTaskStatus.Done))
-                    {
-                        return ApiResponse.Fail("Нельзя завершить задачу, пока не выполнены все подзадачи");
-                    }
-                    task.CompletedAt = DateTime.UtcNow;
-                }
-
                 task.UpdatedAt = DateTime.UtcNow;
                 await _context.SaveChangesAsync();
 
                 _context.ActivityLogs.Add(new ActivityLog
                 {
                     ProjectId = task.ProjectId,
-                    UserId = task.AssigneeId ?? Guid.Empty,
+                    UserId = task.AssigneeId ?? task.CreatedById,
                     ActionType = ActionType.TaskStatusChanged,
                     EntityType = "BacklogItem",
                     EntityId = task.Id,

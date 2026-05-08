@@ -6631,6 +6631,10 @@
               "$ref": "#/components/schemas/BurndownPoint"
             },
             "nullable": true
+          },
+          "projectOwnerId": {
+            "type": "string",
+            "format": "uuid"
           }
         },
         "additionalProperties": false

@@ -1,9 +1,11 @@
-﻿// Controllers/BacklogController.cs
-using Microsoft.AspNetCore.Authorization;
+﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using ProjectManagementAPI.DataBaseContext;
 using ProjectManagementAPI.DTO.Common;
 using ProjectManagementAPI.DTO.Requests;
 using ProjectManagementAPI.DTO.Responses;
+using ProjectManagementAPI.Enums;
 using ProjectManagementAPI.Extensions;
 using ProjectManagementAPI.Interfaces;
 
@@ -15,30 +17,38 @@ namespace ProjectManagementAPI.Controllers
     public class BacklogController : ControllerBase
     {
         private readonly IBacklogService _backlogService;
+        private readonly ContextDb _context;
 
-        public BacklogController(IBacklogService backlogService)
+        public BacklogController(IBacklogService backlogService, ContextDb context)
         {
             _backlogService = backlogService;
+            _context = context;
         }
 
         /// <summary>
-        /// Создание элемента бэклога
+        /// Проверяет, является ли текущий пользователь Viewer в проекте
         /// </summary>
+        private async Task<bool> IsViewer(Guid projectId)
+        {
+            var userId = User.GetUserId();
+            var member = await _context.ProjectMembers
+                .FirstOrDefaultAsync(pm => pm.ProjectId == projectId && pm.UserId == userId);
+            return member?.RoleInProject == ProjectRole.Viewer;
+        }
+
         [HttpPost]
         public async Task<ActionResult<ApiResponse<BacklogItemResponse>>> CreateBacklogItem(CreateBacklogItemRequest request)
         {
             if (!ModelState.IsValid)
-            {
                 return BadRequest(ApiResponse<BacklogItemResponse>.Fail("Неверные данные"));
-            }
+
+            if (await IsViewer(request.ProjectId))
+                return Forbid();
 
             var response = await _backlogService.CreateBacklogItemAsync(request);
             return Ok(response);
         }
 
-        /// <summary>
-        /// Получение элемента бэклога по ID
-        /// </summary>
         [HttpGet("{id}")]
         public async Task<ActionResult<ApiResponse<BacklogItemResponse>>> GetBacklogItemById(Guid id)
         {
@@ -46,9 +56,6 @@ namespace ProjectManagementAPI.Controllers
             return Ok(response);
         }
 
-        /// <summary>
-        /// Получение детальной информации о задаче (с подзадачами, комментариями)
-        /// </summary>
         [HttpGet("{id}/detail")]
         public async Task<ActionResult<ApiResponse<BacklogItemDetailResponse>>> GetBacklogItemDetail(Guid id)
         {
@@ -63,9 +70,6 @@ namespace ProjectManagementAPI.Controllers
             }
         }
 
-        /// <summary>
-        /// Получение бэклога проекта
-        /// </summary>
         [HttpGet("project/{projectId}")]
         public async Task<ActionResult<ApiResponse<PagedResult<BacklogItemResponse>>>> GetProjectBacklog(Guid projectId, [FromQuery] PagedRequest request)
         {
@@ -73,60 +77,62 @@ namespace ProjectManagementAPI.Controllers
             return Ok(response);
         }
 
-        /// <summary>
-        /// Обновление элемента бэклога
-        /// </summary>
         [HttpPut("{id}")]
         public async Task<ActionResult<ApiResponse<BacklogItemResponse>>> UpdateBacklogItem(Guid id, UpdateBacklogItemRequest request)
         {
+            var item = await _context.BacklogItems.FindAsync(id);
+            if (item != null && await IsViewer(item.ProjectId))
+                return Forbid();
+
             var response = await _backlogService.UpdateBacklogItemAsync(id, request);
             return Ok(response);
         }
 
-        /// <summary>
-        /// Удаление элемента бэклога
-        /// </summary>
         [HttpDelete("{id}")]
         public async Task<ActionResult<ApiResponse>> DeleteBacklogItem(Guid id)
         {
+            var item = await _context.BacklogItems.FindAsync(id);
+            if (item != null && await IsViewer(item.ProjectId))
+                return Forbid();
+
             var response = await _backlogService.DeleteBacklogItemAsync(id);
             return Ok(response);
         }
 
-        /// <summary>
-        /// Изменение статуса задачи
-        /// </summary>
         [HttpPatch("{id}/status")]
         public async Task<ActionResult<ApiResponse<BacklogItemResponse>>> ChangeStatus(Guid id, ChangeTaskStatusRequest request)
         {
+            var item = await _context.BacklogItems.FindAsync(id);
+            if (item != null && await IsViewer(item.ProjectId))
+                return Forbid();
+
             var response = await _backlogService.ChangeStatusAsync(id, request);
             return Ok(response);
         }
 
-        /// <summary>
-        /// Переупорядочивание бэклога (drag-and-drop)
-        /// </summary>
         [HttpPost("reorder")]
         public async Task<ActionResult<ApiResponse>> ReorderBacklog(ReorderBacklogRequest request)
         {
+            var firstItem = await _context.BacklogItems.FindAsync(request.Items.FirstOrDefault()?.Id ?? Guid.Empty);
+            if (firstItem != null && await IsViewer(firstItem.ProjectId))
+                return Forbid();
+
             var response = await _backlogService.ReorderBacklogAsync(request);
             return Ok(response);
         }
 
-        /// <summary>
-        /// Добавление комментария к задаче
-        /// </summary>
         [HttpPost("{backlogItemId}/comments")]
         public async Task<ActionResult<ApiResponse<CommentResponse>>> AddComment(Guid backlogItemId, AddCommentRequest request)
         {
-            var userId = User.GetUserId(); 
+            var item = await _context.BacklogItems.FindAsync(backlogItemId);
+            if (item != null && await IsViewer(item.ProjectId))
+                return Forbid();
+
+            var userId = User.GetUserId();
             var response = await _backlogService.AddCommentAsync(backlogItemId, request, userId);
             return Ok(response);
         }
 
-        /// <summary>
-        /// Обновление комментария
-        /// </summary>
         [HttpPut("comments/{commentId}")]
         public async Task<ActionResult<ApiResponse<CommentResponse>>> UpdateComment(Guid commentId, UpdateCommentRequest request)
         {
@@ -135,9 +141,6 @@ namespace ProjectManagementAPI.Controllers
             return Ok(response);
         }
 
-        /// <summary>
-        /// Удаление комментария
-        /// </summary>
         [HttpDelete("comments/{commentId}")]
         public async Task<ActionResult<ApiResponse>> DeleteComment(Guid commentId)
         {
@@ -146,12 +149,13 @@ namespace ProjectManagementAPI.Controllers
             return Ok(response);
         }
 
-        /// <summary>
-        /// Загрузка вложения
-        /// </summary>
         [HttpPost("{backlogItemId}/attachments")]
         public async Task<ActionResult<ApiResponse<AttachmentResponse>>> UploadAttachment(Guid backlogItemId, [FromForm] UploadFileRequest request)
         {
+            var item = await _context.BacklogItems.FindAsync(backlogItemId);
+            if (item != null && await IsViewer(item.ProjectId))
+                return Forbid();
+
             var uploadRequest = new UploadAttachmentRequest
             {
                 FileContent = request.FileContent,
@@ -162,9 +166,6 @@ namespace ProjectManagementAPI.Controllers
             return Ok(response);
         }
 
-        /// <summary>
-        /// Удаление вложения
-        /// </summary>
         [HttpDelete("attachments/{attachmentId}")]
         public async Task<ActionResult<ApiResponse>> DeleteAttachment(Guid attachmentId)
         {
@@ -172,9 +173,6 @@ namespace ProjectManagementAPI.Controllers
             return Ok(response);
         }
 
-        /// <summary>
-        /// Скачивание вложения
-        /// </summary>
         [HttpGet("attachments/{attachmentId}/download")]
         public async Task<IActionResult> DownloadAttachment(Guid attachmentId)
         {
@@ -185,19 +183,17 @@ namespace ProjectManagementAPI.Controllers
             return File(fileData, "application/octet-stream", $"{attachmentId}.file");
         }
 
-        /// <summary>
-        /// Добавление блокера
-        /// </summary>
         [HttpPost("{backlogItemId}/blockers")]
         public async Task<ActionResult<ApiResponse<BlockerResponse>>> AddBlocker(Guid backlogItemId, AddBlockerRequest request)
         {
+            var item = await _context.BacklogItems.FindAsync(backlogItemId);
+            if (item != null && await IsViewer(item.ProjectId))
+                return Forbid();
+
             var response = await _backlogService.AddBlockerAsync(backlogItemId, request.Description, request.Severity);
             return Ok(response);
         }
 
-        /// <summary>
-        /// Разрешение блокера
-        /// </summary>
         [HttpPatch("blockers/{blockerId}/resolve")]
         public async Task<ActionResult<ApiResponse>> ResolveBlocker(Guid blockerId, ResolveBlockerRequest request)
         {

@@ -63,7 +63,7 @@ namespace ProjectManagementAPI.Services
                 _context.Users.Add(user);
                 await _context.SaveChangesAsync();
 
-                var authResponse = await GenerateAuthResponse(user);
+                var authResponse = await GenerateAuthResponse(user, false);
                 return ApiResponse<AuthResponse>.Ok(authResponse, "Регистрация успешна");
             }
             catch (Exception ex)
@@ -95,7 +95,7 @@ namespace ProjectManagementAPI.Services
                     return ApiResponse<AuthResponse>.Fail("Учетная запись деактивирована. Обратитесь к администратору.");
                 }
 
-                var authResponse = await GenerateAuthResponse(user);
+                var authResponse = await GenerateAuthResponse(user, request.RememberMe);
                 return ApiResponse<AuthResponse>.Ok(authResponse, "Вход выполнен успешно");
             }
             catch (Exception ex)
@@ -407,13 +407,13 @@ namespace ProjectManagementAPI.Services
 
         #region Private Methods
 
-        private async Task<AuthResponse> GenerateAuthResponse(User user)
+        private async Task<AuthResponse> GenerateAuthResponse(User user, bool rememberMe = false)
         {
-            var token = GenerateJwtToken(user);
+            var token = GenerateJwtToken(user, rememberMe);
             var refreshToken = GenerateRefreshToken();
 
             user.RefreshToken = refreshToken;
-            user.RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(7);
+            user.RefreshTokenExpiryTime = rememberMe ? DateTime.UtcNow.AddDays(30) : DateTime.UtcNow.AddDays(7);
             await _context.SaveChangesAsync();
 
             return new AuthResponse
@@ -423,13 +423,13 @@ namespace ProjectManagementAPI.Services
                 Email = user.Email,
                 FullName = user.FullName,
                 Token = token,
-                TokenExpiresAt = DateTime.UtcNow.AddHours(1),
+                TokenExpiresAt = rememberMe ? DateTime.UtcNow.AddDays(7) : DateTime.UtcNow.AddHours(1),
                 Role = user.Role.ToString(),
                 RefreshToken = refreshToken
             };
         }
 
-        private string GenerateJwtToken(User user)
+        private string GenerateJwtToken(User user, bool rememberMe = false)
         {
             var claims = new[]
             {
@@ -443,7 +443,7 @@ namespace ProjectManagementAPI.Services
 
             var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_configuration["Jwt:Key"] ?? "default-key-12345678901234567890"));
             var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
-            var expires = DateTime.UtcNow.AddHours(1);
+            var expires = rememberMe ? DateTime.UtcNow.AddDays(7) : DateTime.UtcNow.AddHours(1);
 
             var token = new JwtSecurityToken(
                 issuer: _configuration["Jwt:Issuer"],

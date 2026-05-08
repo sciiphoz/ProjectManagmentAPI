@@ -52,12 +52,12 @@ namespace ProjectManagementAPI.Services
                 };
 
                 _context.SubTasks.Add(subTask);
-                await _context.SaveChangesAsync();
 
+                // Лог — используем AssigneeId задачи или CreatedById
                 _context.ActivityLogs.Add(new ActivityLog
                 {
                     ProjectId = backlogItem.ProjectId,
-                    UserId = request.CreatedById,
+                    UserId = backlogItem.AssigneeId ?? backlogItem.CreatedById,
                     ActionType = ActionType.SubTaskCreated,
                     EntityType = "SubTask",
                     EntityId = subTask.Id,
