@@ -35,7 +35,6 @@ namespace ProjectManagementAPI.Models
         [Required]
         public DateTime UploadedAt { get; set; } = DateTime.UtcNow;
 
-        // Navigation properties
         [ForeignKey("BacklogItemId")]
         public virtual BacklogItem? BacklogItem { get; set; }
 

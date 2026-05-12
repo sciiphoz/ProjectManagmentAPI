@@ -435,17 +435,26 @@ namespace ProjectManagementAPI.Services
         {
             var backlogItem = await _context.BacklogItems.FindAsync(backlogItemId);
             if (backlogItem == null)
-            {
                 return ApiResponse<AttachmentResponse>.Fail("Задача не найдена");
-            }
+
+            var uploadsFolder = Path.Combine(Directory.GetCurrentDirectory(), "Uploads", "Attachments");
+            if (!Directory.Exists(uploadsFolder))
+                Directory.CreateDirectory(uploadsFolder);
+
+            var fileId = Guid.NewGuid();
+            var fileExtension = Path.GetExtension(request.FileName);
+            var storedFileName = $"{fileId}{fileExtension}";
+            var filePath = Path.Combine(uploadsFolder, storedFileName);
+
+            await File.WriteAllBytesAsync(filePath, request.FileContent);
 
             var attachment = new Attachment
             {
-                Id = Guid.NewGuid(),
+                Id = fileId,
                 BacklogItemId = backlogItemId,
                 UploadedById = request.UploadedById,
                 FileName = request.FileName,
-                FileUrl = $"/attachments/{Guid.NewGuid()}/{request.FileName}",
+                FileUrl = $"/api/backlog/attachments/{fileId}/download",
                 FileSize = request.FileContent.Length,
                 MimeType = request.MimeType,
                 UploadedAt = DateTime.UtcNow
@@ -464,12 +473,36 @@ namespace ProjectManagementAPI.Services
                 UploadedBy = new UserBriefResponse
                 {
                     Id = request.UploadedById,
-                    FullName = request.UploadedByName
+                    FullName = request.UploadedByName ?? "Неизвестный"
                 },
                 UploadedAt = attachment.UploadedAt
             };
 
             return ApiResponse<AttachmentResponse>.Ok(response, "Файл загружен");
+        }
+
+        public async Task<byte[]> DownloadAttachmentAsync(Guid attachmentId)
+        {
+            var attachment = await _context.Attachments.FindAsync(attachmentId);
+            if (attachment == null)
+            {
+                _logger.LogWarning("Запись в БД не найдена для attachmentId: {Id}", attachmentId);
+                return Array.Empty<byte>();
+            }
+
+            var uploadsFolder = Path.Combine(Directory.GetCurrentDirectory(), "Uploads", "Attachments");
+            var fileExtension = Path.GetExtension(attachment.FileName);
+            var storedFileName = $"{attachmentId}{fileExtension}";
+            var filePath = Path.Combine(uploadsFolder, storedFileName);
+
+            if (!File.Exists(filePath))
+            {
+                _logger.LogWarning("Файл не найден на диске: {Path}. Искали по имени: {FileName}", filePath, storedFileName);
+                return Array.Empty<byte>();
+            }
+
+            _logger.LogInformation("Файл найден, размер: {Size} байт", new FileInfo(filePath).Length);
+            return await File.ReadAllBytesAsync(filePath);
         }
 
         public async Task<ApiResponse> DeleteAttachmentAsync(Guid attachmentId)
@@ -480,21 +513,20 @@ namespace ProjectManagementAPI.Services
                 return ApiResponse.Fail("Вложение не найдено");
             }
 
+            var uploadsFolder = Path.Combine(Directory.GetCurrentDirectory(), "Uploads", "Attachments");
+            var fileExtension = Path.GetExtension(attachment.FileName);
+            var storedFileName = $"{attachmentId}{fileExtension}";
+            var filePath = Path.Combine(uploadsFolder, storedFileName);
+
+            if (File.Exists(filePath))
+            {
+                File.Delete(filePath);
+            }
+
             _context.Attachments.Remove(attachment);
             await _context.SaveChangesAsync();
 
             return ApiResponse.Ok("Вложение удалено");
-        }
-
-        public async Task<byte[]> DownloadAttachmentAsync(Guid attachmentId)
-        {
-            var attachment = await _context.Attachments.FindAsync(attachmentId);
-            if (attachment == null)
-            {
-                return Array.Empty<byte>();
-            }
-
-            return Array.Empty<byte>();
         }
 
         public async Task<ApiResponse<BlockerResponse>> AddBlockerAsync(Guid backlogItemId, string description, string severity)

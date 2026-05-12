@@ -4,10 +4,7 @@ namespace ProjectManagementAPI.DTO.Requests
 {
     public class UploadFileRequest
     {
-        [Required]
-        public IFormFile File { get; set; } = null!;
-
-        public byte[] FileContent { get; set; } = Array.Empty<byte>();
+        public IFormFile File { get; set; }
     }
 
     public class AddBlockerRequest

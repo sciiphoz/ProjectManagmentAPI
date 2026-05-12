@@ -1041,26 +1041,16 @@
           "content": {
             "multipart/form-data": {
               "schema": {
-                "required": [
-                  "File"
-                ],
                 "type": "object",
                 "properties": {
                   "File": {
                     "type": "string",
                     "format": "binary"
-                  },
-                  "FileContent": {
-                    "type": "string",
-                    "format": "byte"
                   }
                 }
               },
               "encoding": {
                 "File": {
-                  "style": "form"
-                },
-                "FileContent": {
                   "style": "form"
                 }
               }

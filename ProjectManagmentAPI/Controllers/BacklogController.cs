@@ -156,12 +156,26 @@ namespace ProjectManagementAPI.Controllers
             if (item != null && await IsViewer(item.ProjectId))
                 return Forbid();
 
+            var currentUserId = User.GetUserId();
+            var currentUser = await _context.Users.FindAsync(currentUserId);
+            var currentUserName = currentUser?.FullName ?? "Неизвестный пользователь";
+
+            byte[] fileBytes;
+            using (var ms = new MemoryStream())
+            {
+                await request.File.CopyToAsync(ms);
+                fileBytes = ms.ToArray();
+            }
+
             var uploadRequest = new UploadAttachmentRequest
             {
-                FileContent = request.FileContent,
+                FileContent = fileBytes,
                 FileName = request.File.FileName,
-                MimeType = request.File.ContentType
+                MimeType = request.File.ContentType,
+                UploadedById = currentUserId,
+                UploadedByName = currentUserName
             };
+
             var response = await _backlogService.UploadAttachmentAsync(backlogItemId, uploadRequest);
             return Ok(response);
         }
@@ -178,9 +192,13 @@ namespace ProjectManagementAPI.Controllers
         {
             var fileData = await _backlogService.DownloadAttachmentAsync(attachmentId);
             if (fileData == null || fileData.Length == 0)
-                return NotFound();
+                return NotFound("Файл не найден");
 
-            return File(fileData, "application/octet-stream", $"{attachmentId}.file");
+            var attachment = await _context.Attachments.FindAsync(attachmentId);
+            var fileName = attachment?.FileName ?? $"{attachmentId}.file";
+            var mimeType = attachment?.MimeType ?? "application/octet-stream";
+
+            return File(fileData, mimeType, fileName);
         }
 
         [HttpPost("{backlogItemId}/blockers")]

@@ -300,11 +300,6 @@
         "Name": "File",
         "Type": "Microsoft.AspNetCore.Http.IFormFile",
         "IsRequired": false
-      },
-      {
-        "Name": "FileContent",
-        "Type": "System.Byte[]",
-        "IsRequired": false
       }
     ],
     "ReturnTypes": [

@@ -112,7 +112,6 @@ namespace ProjectManagementAPI.DTO.Requests
 
         public string? MimeType { get; set; }
 
-        // Для сервиса
         public Guid UploadedById { get; set; }
         public string UploadedByName { get; set; } = string.Empty;
     }
