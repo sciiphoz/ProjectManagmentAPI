@@ -26,10 +26,10 @@ namespace ProjectManagementAPI.DTO.Requests
 
     public class AddProjectMemberRequest
     {
-        public Guid? UserId { get; set; }  
+        public Guid? UserId { get; set; }
 
         [EmailAddress]
-        public string? Email { get; set; } 
+        public string? Email { get; set; }
 
         [Required]
         public string Role { get; set; } = string.Empty;
@@ -47,5 +47,19 @@ namespace ProjectManagementAPI.DTO.Requests
     {
         [Required]
         public Guid UserId { get; set; }
+    }
+
+    public class ProjectInvitationStatus
+    {
+        public bool Valid { get; set; }
+        public string? ProjectName { get; set; }
+        public string? Email { get; set; }
+        public string? Role { get; set; }
+    }
+
+    public class AcceptInvitationRequest
+    {
+        [Required]
+        public string Token { get; set; } = string.Empty;
     }
 }

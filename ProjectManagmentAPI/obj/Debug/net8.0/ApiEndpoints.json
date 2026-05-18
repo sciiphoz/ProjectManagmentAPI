@@ -1241,6 +1241,58 @@
   },
   {
     "ContainingType": "ProjectManagementAPI.Controllers.ProjectsController",
+    "Method": "AcceptInvitation",
+    "RelativePath": "api/Projects/invitations/accept",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "request",
+        "Type": "ProjectManagementAPI.DTO.Requests.AcceptInvitationRequest",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": [
+      {
+        "Type": "ProjectManagementAPI.DTO.Common.ApiResponse",
+        "MediaTypes": [
+          "text/plain",
+          "application/json",
+          "text/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
+  },
+  {
+    "ContainingType": "ProjectManagementAPI.Controllers.ProjectsController",
+    "Method": "CheckInvitation",
+    "RelativePath": "api/Projects/invitations/check",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "token",
+        "Type": "System.String",
+        "IsRequired": false
+      }
+    ],
+    "ReturnTypes": [
+      {
+        "Type": "ProjectManagementAPI.DTO.Common.ApiResponse\u00601[[ProjectManagementAPI.DTO.Requests.ProjectInvitationStatus, ProjectManagementAPI, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]",
+        "MediaTypes": [
+          "text/plain",
+          "application/json",
+          "text/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
+  },
+  {
+    "ContainingType": "ProjectManagementAPI.Controllers.ProjectsController",
     "Method": "GetMyProjects",
     "RelativePath": "api/Projects/my",
     "HttpMethod": "GET",

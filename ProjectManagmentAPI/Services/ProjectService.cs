@@ -14,14 +14,20 @@ namespace ProjectManagementAPI.Services
     {
         private readonly ContextDb _context;
         private readonly INotificationService _notificationService;
+        private readonly IEmailService _emailService;
+        private readonly IConfiguration _configuration;
 
         public ProjectService(
             ContextDb context,
             INotificationService notificationService,
+            IEmailService emailService,
+            IConfiguration configuration,
             ILogger<ProjectService> logger) : base(logger)
         {
             _context = context;
             _notificationService = notificationService;
+            _emailService = emailService;
+            _configuration = configuration;
         }
 
         public async Task<ApiResponse<ProjectResponse>> CreateProjectAsync(CreateProjectRequest request, Guid ownerId)
@@ -268,93 +274,156 @@ namespace ProjectManagementAPI.Services
 
         public async Task<ApiResponse<ProjectMemberResponse>> AddMemberAsync(Guid projectId, AddProjectMemberRequest request, Guid currentUserId)
         {
-            try
+            var project = await _context.Projects.FindAsync(projectId);
+            if (project == null)
+                return ApiResponse<ProjectMemberResponse>.Fail("Проект не найден");
+
+            if (!Enum.TryParse<ProjectRole>(request.Role, true, out var role))
+                return ApiResponse<ProjectMemberResponse>.Fail("Неверная роль");
+
+            // Если передан UserId — добавляем пользователя сразу
+            if (request.UserId.HasValue && request.UserId != Guid.Empty)
             {
-                var project = await _context.Projects.FindAsync(projectId);
-                if (project == null)
-                {
-                    return ApiResponse<ProjectMemberResponse>.Fail("Проект не найден");
-                }
-
-                // Проверка прав
-                var isOwner = project.OwnerId == currentUserId;
-                var currentMember = await _context.ProjectMembers
-                    .FirstOrDefaultAsync(pm => pm.ProjectId == projectId && pm.UserId == currentUserId);
-
-                var canAdd = isOwner || (currentMember != null &&
-                    (currentMember.RoleInProject == ProjectRole.ProductOwner ||
-                     currentMember.RoleInProject == ProjectRole.ScrumMaster));
-
-                if (!canAdd)
-                {
-                    return ApiResponse<ProjectMemberResponse>.Fail("У вас нет прав для добавления участников");
-                }
-
-                // Находим пользователя по email (если передан email) или по ID
-                User? user = null;
-                if (!string.IsNullOrEmpty(request.Email))
-                {
-                    user = await _context.Users.FirstOrDefaultAsync(u => u.Email == request.Email);
-                }
-                else if (request.UserId.HasValue)
-                {
-                    user = await _context.Users.FindAsync(request.UserId.Value);
-                }
-
+                var user = await _context.Users.FindAsync(request.UserId.Value);
                 if (user == null)
-                {
-                    return ApiResponse<ProjectMemberResponse>.Fail($"Пользователь не найден");
-                }
+                    return ApiResponse<ProjectMemberResponse>.Fail("Пользователь не найден");
 
-                // Проверяем, не является ли пользователь уже участником
-                var existingMember = await _context.ProjectMembers
-                    .AnyAsync(pm => pm.ProjectId == projectId && pm.UserId == user.Id);
+                var existing = await _context.ProjectMembers
+                    .FirstOrDefaultAsync(pm => pm.ProjectId == projectId && pm.UserId == user.Id);
+                if (existing != null)
+                    return ApiResponse<ProjectMemberResponse>.Fail("Пользователь уже в проекте");
 
-                if (existingMember)
-                {
-                    return ApiResponse<ProjectMemberResponse>.Fail("Пользователь уже является участником проекта");
-                }
-
-                // Добавляем участника
                 var member = new ProjectMember
                 {
                     ProjectId = projectId,
                     UserId = user.Id,
-                    RoleInProject = Enum.Parse<ProjectRole>(request.Role),
+                    RoleInProject = role,
                     JoinedAt = DateTime.UtcNow
                 };
-
                 _context.ProjectMembers.Add(member);
                 await _context.SaveChangesAsync();
 
-                await _notificationService.CreateNotificationAsync(
-                    user.Id,
-                    "Приглашение в проект",
-                    $"Вы были добавлены в проект '{project.Name}' в роли {request.Role}",
-                    "Info",
-                    $"/projects/{projectId}",
-                    projectId,
-                    "Project"
-                );
-
-                var response = new ProjectMemberResponse
-                {
-                    UserId = user.Id,
-                    FullName = user.FullName,
-                    Username = user.Username,
-                    Email = user.Email,
-                    Role = request.Role,
-                    JoinedAt = member.JoinedAt,
-                    IsOwner = false
-                };
-
-                return ApiResponse<ProjectMemberResponse>.Ok(response, "Участник добавлен");
+                return ApiResponse<ProjectMemberResponse>.Ok(MapToMemberResponse(member), "Участник добавлен");
             }
-            catch (Exception ex)
+
+            // Если передан Email — ВСЕГДА отправляем приглашение
+            if (!string.IsNullOrEmpty(request.Email))
             {
-                _logger.LogError(ex, "Ошибка добавления участника в проект {ProjectId}", projectId);
-                return ApiResponse<ProjectMemberResponse>.Fail("Произошла ошибка при добавлении участника");
+                // Проверка: не является ли email уже участником
+                var existingUser = await _context.Users.FirstOrDefaultAsync(u => u.Email == request.Email);
+                if (existingUser != null)
+                {
+                    var alreadyMember = await _context.ProjectMembers
+                        .FirstOrDefaultAsync(pm => pm.ProjectId == projectId && pm.UserId == existingUser.Id);
+                    if (alreadyMember != null)
+                        return ApiResponse<ProjectMemberResponse>.Fail("Пользователь уже в проекте");
+                }
+
+                // Проверка: нельзя отправлять чаще раза в 15 минут
+                var fifteenMinutesAgo = DateTime.UtcNow.AddMinutes(-15);
+                var recentInvitation = await _context.ProjectInvitations
+                    .FirstOrDefaultAsync(i => i.Email == request.Email
+                        && i.ProjectId == projectId
+                        && !i.IsAccepted
+                        && i.CreatedAt > fifteenMinutesAgo);
+                if (recentInvitation != null)
+                {
+                    var remainingSeconds = (int)(recentInvitation.CreatedAt.AddMinutes(15) - DateTime.UtcNow).TotalSeconds;
+                    return ApiResponse<ProjectMemberResponse>.Fail(
+                        $"Приглашение уже отправлено. Повторная отправка возможна через {remainingSeconds} сек.");
+                }
+
+                var token = Guid.NewGuid().ToString("N") + Guid.NewGuid().ToString("N");
+                var invitation = new ProjectInvitation
+                {
+                    ProjectId = projectId,
+                    Email = request.Email,
+                    InvitedRole = role,
+                    InvitedByUserId = currentUserId,
+                    Token = token,
+                    CreatedAt = DateTime.UtcNow,
+                    ExpiresAt = DateTime.UtcNow.AddDays(7)
+                };
+                _context.ProjectInvitations.Add(invitation);
+                await _context.SaveChangesAsync();
+
+                var frontendUrl = _configuration["App:FrontendUrl"] ?? "https://localhost:5001";
+                var invitationLink = $"{frontendUrl}/accept-invitation?token={token}";
+
+                await _emailService.SendProjectInvitationAsync(request.Email, project.Name, invitationLink);
+
+                return ApiResponse<ProjectMemberResponse>.Ok(null, "Приглашение отправлено на почту");
             }
+
+            return ApiResponse<ProjectMemberResponse>.Fail("Укажите UserId или Email для добавления");
+        }
+
+        public async Task<ApiResponse<ProjectInvitationStatus>> CheckInvitationAsync(string token)
+        {
+            var invitation = await _context.ProjectInvitations
+                .Include(i => i.Project)
+                .FirstOrDefaultAsync(i => i.Token == token);
+
+            if (invitation == null || invitation.IsAccepted || invitation.ExpiresAt < DateTime.UtcNow)
+                return ApiResponse<ProjectInvitationStatus>.Fail("Приглашение недействительно");
+
+            return ApiResponse<ProjectInvitationStatus>.Ok(new ProjectInvitationStatus
+            {
+                Valid = true,
+                ProjectName = invitation.Project.Name,
+                Email = invitation.Email,
+                Role = invitation.InvitedRole.ToString()
+            });
+        }
+
+        public async Task<ApiResponse> AcceptInvitationAsync(string token, Guid userId)
+        {
+            var invitation = await _context.ProjectInvitations
+                .FirstOrDefaultAsync(i => i.Token == token);
+
+            if (invitation == null || invitation.IsAccepted || invitation.ExpiresAt < DateTime.UtcNow)
+                return ApiResponse.Fail("Приглашение недействительно или истекло");
+
+            var user = await _context.Users.FindAsync(userId);
+            if (user == null)
+                return ApiResponse.Fail("Пользователь не найден");
+
+            if (user.Email.ToLower() != invitation.Email.ToLower())
+                return ApiResponse.Fail("Email текущего пользователя не совпадает с приглашением");
+
+            var existing = await _context.ProjectMembers
+                .FirstOrDefaultAsync(pm => pm.ProjectId == invitation.ProjectId && pm.UserId == userId);
+            if (existing != null)
+                return ApiResponse.Fail("Вы уже участник этого проекта");
+
+            var member = new ProjectMember
+            {
+                ProjectId = invitation.ProjectId,
+                UserId = userId,
+                RoleInProject = invitation.InvitedRole,
+                JoinedAt = DateTime.UtcNow
+            };
+            _context.ProjectMembers.Add(member);
+
+            invitation.IsAccepted = true;
+            invitation.AcceptedAt = DateTime.UtcNow;
+            await _context.SaveChangesAsync();
+
+            return ApiResponse.Ok("Приглашение принято");
+        }
+
+        private ProjectMemberResponse MapToMemberResponse(ProjectMember member)
+        {
+            return new ProjectMemberResponse
+            {
+                UserId = member.UserId,
+                FullName = member.User?.FullName ?? "",
+                Username = member.User?.Username ?? "",
+                Email = member.User?.Email ?? "",
+                Role = member.RoleInProject.ToString(),
+                JoinedAt = member.JoinedAt,
+                IsOwner = false
+            };
         }
 
         public async Task<ApiResponse> UpdateMemberRoleAsync(Guid projectId, UpdateMemberRoleRequest request)

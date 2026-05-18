@@ -26,6 +26,7 @@ namespace ProjectManagementAPI.DataBaseContext
         public DbSet<Notification> Notifications { get; set; }
         public DbSet<RetrospectiveItem> RetrospectiveItems { get; set; }
         public DbSet<RetrospectiveVote> RetrospectiveVotes { get; set; }
+        public DbSet<ProjectInvitation> ProjectInvitations { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -53,6 +54,9 @@ namespace ProjectManagementAPI.DataBaseContext
             modelBuilder.Entity<SprintVelocity>()
                 .HasIndex(sv => sv.SprintId)
                 .IsUnique();
+
+            modelBuilder.Entity<ProjectInvitation>()
+                .HasIndex(i => new { i.Email, i.ProjectId, i.IsAccepted });
 
             modelBuilder.Entity<Sprint>()
                 .ToTable(t => t.HasCheckConstraint("CK_Sprint_Dates", "[StartDate] <= [EndDate]"));

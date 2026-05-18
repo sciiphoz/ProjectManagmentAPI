@@ -123,6 +123,23 @@ namespace ProjectManagementAPI.Controllers
             return Ok(response);
         }
 
+        [HttpGet("invitations/check")]
+        [AllowAnonymous]
+        public async Task<ActionResult<ApiResponse<ProjectInvitationStatus>>> CheckInvitation([FromQuery] string token)
+        {
+            var response = await _projectService.CheckInvitationAsync(token);
+            return Ok(response);
+        }
+
+        [HttpPost("invitations/accept")]
+        [Authorize]
+        public async Task<ActionResult<ApiResponse>> AcceptInvitation([FromBody] AcceptInvitationRequest request)
+        {
+            var userId = User.GetUserId();
+            var response = await _projectService.AcceptInvitationAsync(request.Token, userId);
+            return Ok(response);
+        }
+
         [HttpGet("{projectId}/statistics")]
         public async Task<ActionResult<ApiResponse<ProjectStatisticsResponse>>> GetProjectStatistics(Guid projectId)
         {

@@ -124,5 +124,61 @@ namespace ProjectManagementAPI.Services
                 throw;
             }
         }
+        public async Task SendProjectInvitationAsync(string email, string projectName, string invitationLink)
+        {
+            try
+            {
+                var smtpSettings = _configuration.GetSection("Smtp");
+                var host = smtpSettings["Host"];
+                var port = int.Parse(smtpSettings["Port"] ?? "587");
+                var enableSsl = bool.Parse(smtpSettings["EnableSsl"] ?? "true");
+                var username = smtpSettings["Username"];
+                var password = smtpSettings["Password"];
+                var fromEmail = smtpSettings["FromEmail"];
+                var fromName = smtpSettings["FromName"] ?? "Project Management System";
+
+                using var client = new SmtpClient(host, port);
+                client.EnableSsl = enableSsl;
+                client.Credentials = new NetworkCredential(username, password);
+
+                var subject = $"Приглашение в проект «{projectName}»";
+                var body = $@"
+            <html>
+            <body style='font-family: Arial, sans-serif;'>
+                <div style='max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #ddd; border-radius: 10px;'>
+                    <h2 style='color: #333;'>Приглашение в проект</h2>
+                    <p>Здравствуйте!</p>
+                    <p>Вас пригласили присоединиться к проекту <strong>«{projectName}»</strong>.</p>
+                    <p>Для принятия приглашения перейдите по ссылке:</p>
+                    <div style='text-align: center; margin: 20px 0;'>
+                        <a href='{invitationLink}' style='display: inline-block; padding: 12px 24px; background-color: #28a745; color: white; text-decoration: none; border-radius: 5px;'>Принять приглашение</a>
+                    </div>
+                    <p>Или скопируйте ссылку в браузер:</p>
+                    <p style='word-break: break-all;'>{invitationLink}</p>
+                    <p style='color: #888;'>Срок действия ссылки — 7 дней.</p>
+                    <hr style='margin: 20px 0;' />
+                    <p style='color: #888; font-size: 12px;'>С уважением,<br/>Команда Project Management System</p>
+                </div>
+            </body>
+            </html>";
+
+                using var message = new MailMessage
+                {
+                    From = new MailAddress(fromEmail, fromName),
+                    Subject = subject,
+                    Body = body,
+                    IsBodyHtml = true
+                };
+                message.To.Add(email);
+
+                await client.SendMailAsync(message);
+                _logger.LogInformation($"Приглашение в проект отправлено на {email}");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Ошибка отправки приглашения на {email}");
+                throw;
+            }
+        }
     }
 }

@@ -2,9 +2,6 @@
 using ProjectManagementAPI.DTO.Common;
 using ProjectManagementAPI.DTO.Requests;
 using ProjectManagementAPI.DTO.Responses;
-using ProjectManagementAPI.DTO.Common;
-using ProjectManagementAPI.DTO.Requests;
-using ProjectManagementAPI.DTO.Responses;
 
 namespace ProjectManagementAPI.Interfaces
 {
@@ -24,6 +21,8 @@ namespace ProjectManagementAPI.Interfaces
         Task<ApiResponse<ProjectMemberResponse>> AddMemberAsync(Guid projectId, AddProjectMemberRequest request, Guid currentUserId);
         Task<ApiResponse> UpdateMemberRoleAsync(Guid projectId, UpdateMemberRoleRequest request);
         Task<ApiResponse> RemoveMemberAsync(Guid projectId, RemoveMemberRequest request);
+        Task<ApiResponse<ProjectInvitationStatus>> CheckInvitationAsync(string token);
+        Task<ApiResponse> AcceptInvitationAsync(string token, Guid userId);
 
         // Статистика
         Task<ApiResponse<ProjectStatisticsResponse>> GetProjectStatisticsAsync(Guid projectId);
