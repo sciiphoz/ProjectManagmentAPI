@@ -347,7 +347,7 @@ namespace ProjectManagementAPI.Services
                 _context.ProjectInvitations.Add(invitation);
                 await _context.SaveChangesAsync();
 
-                var frontendUrl = _configuration["App:FrontendUrl"] ?? "https://localhost:5001";
+                var frontendUrl = _configuration["App:FrontendUrl"] ?? "https://localhost:7064";
                 var invitationLink = $"{frontendUrl}/accept-invitation?token={token}";
 
                 await _emailService.SendProjectInvitationAsync(request.Email, project.Name, invitationLink);

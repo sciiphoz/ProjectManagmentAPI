@@ -383,7 +383,6 @@ namespace ProjectManagementAPI.Services
                 return ApiResponse<CommentResponse>.Fail("Комментарий не найден");
             }
 
-            // Проверяем, что пользователь — автор комментария
             if (comment.UserId != userId)
             {
                 return ApiResponse<CommentResponse>.Fail("Вы не можете редактировать чужой комментарий");

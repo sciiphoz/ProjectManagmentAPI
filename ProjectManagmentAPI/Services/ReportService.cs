@@ -248,14 +248,17 @@ namespace ProjectManagementAPI.Services
                         .Where(bi => bi.SprintId == sprint.Id)
                         .ToListAsync();
 
+                    var totalSP = (int)tasks.Sum(t => t.StoryPoints ?? 0);
+                    var completedSP = (int)tasks.Where(t => t.Status == BacklogItemStatus.Done).Sum(t => t.StoryPoints ?? 0);
+
                     velocities.Add(new SprintVelocityHistory
                     {
                         SprintId = sprint.Id,
                         SprintName = sprint.Name,
                         EndDate = sprint.EndDate,
-                        TotalStoryPoints = sprint.CommittedStoryPoints ?? 0,
-                        CompletedStoryPoints = sprint.CompletedStoryPoints ?? 0,
-                        Velocity = sprint.CompletedStoryPoints ?? 0,
+                        TotalStoryPoints = totalSP,
+                        CompletedStoryPoints = completedSP,
+                        Velocity = completedSP,
                         CommittedTasks = tasks.Count,
                         CompletedTasks = tasks.Count(t => t.Status == BacklogItemStatus.Done)
                     });
