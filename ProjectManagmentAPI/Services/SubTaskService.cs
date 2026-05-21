@@ -53,7 +53,6 @@ namespace ProjectManagementAPI.Services
 
                 _context.SubTasks.Add(subTask);
 
-                // Лог — используем AssigneeId задачи или CreatedById
                 _context.ActivityLogs.Add(new ActivityLog
                 {
                     ProjectId = backlogItem.ProjectId,
@@ -137,11 +136,14 @@ namespace ProjectManagementAPI.Services
                     .OrderBy(st => st.OrderInParent)
                     .ToListAsync();
 
-                var responses = new List<SubTaskResponse>();
-                foreach (var subTask in subTasks)
-                {
-                    responses.Add(await MapToSubTaskResponse(subTask));
-                }
+                var subTaskIds = subTasks.Select(st => st.Id).ToList();
+                var blockers = await _context.Blockers
+                    .Where(b => b.SubTaskId != null && subTaskIds.Contains(b.SubTaskId.Value) && b.Status == BlockerStatus.Active)
+                    .ToListAsync();
+
+                var blockerLookup = blockers.GroupBy(b => b.SubTaskId!.Value).ToDictionary(g => g.Key, g => g.ToList());
+
+                var responses = subTasks.Select(subTask => MapToSubTaskResponse(subTask, blockerLookup.GetValueOrDefault(subTask.Id))).ToList();
 
                 return ApiResponse<List<SubTaskResponse>>.Ok(responses);
             }
@@ -150,6 +152,48 @@ namespace ProjectManagementAPI.Services
                 _logger.LogError(ex, "Ошибка получения подзадач задачи {BacklogItemId}", backlogItemId);
                 return ApiResponse<List<SubTaskResponse>>.Fail("Произошла ошибка при получении подзадач");
             }
+        }
+
+        private SubTaskResponse MapToSubTaskResponse(SubTask subTask, List<Blocker>? blockers = null)
+        {
+            var activeBlockers = blockers?.Select(b => new BlockerResponse
+            {
+                Id = b.Id,
+                Description = b.Description,
+                Severity = b.Severity.ToString(),
+                Status = b.Status.ToString(),
+                CreatedAt = b.CreatedAt
+            }).ToList() ?? new();
+
+            return new SubTaskResponse
+            {
+                Id = subTask.Id,
+                BacklogItemId = subTask.BacklogItemId,
+                Title = subTask.Title,
+                Description = subTask.Description,
+                EstimatedHours = subTask.EstimatedHours,
+                ActualHours = subTask.ActualHours,
+                Status = subTask.Status.ToString(),
+                Assignee = subTask.Assignee != null ? new UserBriefResponse
+                {
+                    Id = subTask.Assignee.Id,
+                    FullName = subTask.Assignee.FullName,
+                    Username = subTask.Assignee.Username
+                } : null,
+                OrderInParent = subTask.OrderInParent,
+                StartedAt = subTask.StartedAt,
+                CompletedAt = subTask.CompletedAt,
+                CreatedAt = subTask.CreatedAt,
+                UpdatedAt = subTask.UpdatedAt,
+                IsOverdue = subTask.CompletedAt == null && subTask.StartedAt != null &&
+                            (DateTime.UtcNow - subTask.StartedAt.Value).TotalDays > 3,
+                HasBlockers = activeBlockers.Any(),
+                ActiveBlockers = activeBlockers,
+                ActualMinutes = subTask.ActualHours.HasValue ? (int?)(subTask.ActualHours.Value * 60) : null,
+                Efficiency = subTask.EstimatedHours.HasValue && subTask.ActualHours.HasValue
+                    ? Math.Round((double)subTask.EstimatedHours.Value / (double)subTask.ActualHours.Value * 100, 1)
+                    : null
+            };
         }
 
         public async Task<ApiResponse<SubTaskResponse>> UpdateSubTaskAsync(Guid subTaskId, UpdateSubTaskRequest request)

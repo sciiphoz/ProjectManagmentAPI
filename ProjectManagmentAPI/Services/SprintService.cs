@@ -378,7 +378,6 @@ namespace ProjectManagementAPI.Services
                     return ApiResponse<SprintBoardResponse>.Fail("Спринт не найден");
                 }
 
-                // Загружаем задачи с минимальными связями через проекцию
                 var boardTasks = await _context.BacklogItems
                     .Where(bi => bi.SprintId == sprintId)
                     .Select(bi => new BacklogItemBoardResponse
@@ -781,16 +780,18 @@ namespace ProjectManagementAPI.Services
 
         private async Task<SprintResponse> MapToSprintResponse(Sprint sprint)
         {
-            var backlogItems = await _context.BacklogItems
+            var stats = await _context.BacklogItems
                 .Where(bi => bi.SprintId == sprint.Id)
-                .ToListAsync();
+                .GroupBy(_ => 1)
+                .Select(g => new
+                {
+                    TotalTasks = g.Count(),
+                    CompletedTasks = g.Count(bi => bi.Status == BacklogItemStatus.Done),
+                    TotalStoryPoints = g.Sum(bi => bi.StoryPoints ?? 0),
+                    CompletedStoryPoints = g.Sum(bi => bi.Status == BacklogItemStatus.Done ? bi.StoryPoints ?? 0 : 0)
+                })
+                .FirstOrDefaultAsync();
 
-            var totalTasks = backlogItems.Count;
-            var completedTasks = backlogItems.Count(bi => bi.Status == BacklogItemStatus.Done);
-            var totalStoryPoints = backlogItems.Sum(bi => bi.StoryPoints ?? 0);
-            var completedStoryPoints = backlogItems
-                .Where(bi => bi.Status == BacklogItemStatus.Done)
-                .Sum(bi => bi.StoryPoints ?? 0);
             var daysRemaining = sprint.IsActive && sprint.EndDate > DateTime.UtcNow.Date
                 ? (sprint.EndDate - DateTime.UtcNow.Date).Days
                 : 0;
@@ -806,11 +807,11 @@ namespace ProjectManagementAPI.Services
                 Status = sprint.Status.ToString(),
                 CreatedAt = sprint.CreatedAt,
                 ProjectId = sprint.ProjectId,
-                TotalTasksCount = totalTasks,
-                CompletedTasksCount = completedTasks,
-                TotalStoryPoints = totalStoryPoints,
-                CompletedStoryPoints = completedStoryPoints,
-                CompletionPercentage = totalTasks > 0 ? (double)completedTasks / totalTasks * 100 : 0,
+                TotalTasksCount = stats?.TotalTasks ?? 0,
+                CompletedTasksCount = stats?.CompletedTasks ?? 0,
+                TotalStoryPoints = stats?.TotalStoryPoints ?? 0,
+                CompletedStoryPoints = stats?.CompletedStoryPoints ?? 0,
+                CompletionPercentage = stats?.TotalTasks > 0 ? (double)(stats?.CompletedTasks ?? 0) / (stats?.TotalTasks ?? 1) * 100 : 0,
                 DaysRemaining = daysRemaining,
                 CommittedStoryPoints = sprint.CommittedStoryPoints,
                 CompletedStoryPointsModel = sprint.CompletedStoryPoints,

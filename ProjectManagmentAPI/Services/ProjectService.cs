@@ -563,17 +563,16 @@ namespace ProjectManagementAPI.Services
 
         private async Task<ProjectResponse> MapToProjectResponse(Project project)
         {
-            var membersCount = await _context.ProjectMembers
-                .CountAsync(pm => pm.ProjectId == project.Id);
-
-            var activeSprints = await _context.Sprints
-                .CountAsync(s => s.ProjectId == project.Id && s.IsActive);
-
-            var totalTasks = await _context.BacklogItems
-                .CountAsync(bi => bi.ProjectId == project.Id);
-
-            var completedTasks = await _context.BacklogItems
-                .CountAsync(bi => bi.ProjectId == project.Id && bi.Status == BacklogItemStatus.Done);
+            var stats = await _context.Projects
+                .Where(p => p.Id == project.Id)
+                .Select(p => new
+                {
+                    MembersCount = p.Members.Count,
+                    ActiveSprints = p.Sprints.Count(s => s.IsActive),
+                    TotalTasks = p.BacklogItems.Count,
+                    CompletedTasks = p.BacklogItems.Count(bi => bi.Status == BacklogItemStatus.Done)
+                })
+                .FirstOrDefaultAsync();
 
             return new ProjectResponse
             {
@@ -590,10 +589,10 @@ namespace ProjectManagementAPI.Services
                 CreatedAt = project.CreatedAt,
                 UpdatedAt = project.UpdatedAt,
                 IsArchived = project.IsArchived,
-                MembersCount = membersCount,
-                ActiveSprintsCount = activeSprints,
-                TotalTasksCount = totalTasks,
-                CompletedTasksCount = completedTasks
+                MembersCount = stats?.MembersCount ?? 0,
+                ActiveSprintsCount = stats?.ActiveSprints ?? 0,
+                TotalTasksCount = stats?.TotalTasks ?? 0,
+                CompletedTasksCount = stats?.CompletedTasks ?? 0
             };
         }
 

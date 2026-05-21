@@ -357,20 +357,20 @@ namespace ProjectManagementAPI.Services
                 var totalCount = await query.CountAsync();
 
                 var users = await query
+                    .OrderBy(u => u.Username)
                     .Skip((request.PageNumber - 1) * request.PageSize)
                     .Take(request.PageSize)
-                    .Select(u => MapToUserResponse(u))
                     .ToListAsync();
 
-                var result = new PagedResult<UserResponse>
+                var items = users.Select(MapToUserResponse).ToList();
+
+                return ApiResponse<PagedResult<UserResponse>>.Ok(new PagedResult<UserResponse>
                 {
-                    Items = users,
+                    Items = items,
                     TotalCount = totalCount,
                     PageNumber = request.PageNumber,
                     PageSize = request.PageSize
-                };
-
-                return ApiResponse<PagedResult<UserResponse>>.Ok(result);
+                });
             }
             catch (Exception ex)
             {

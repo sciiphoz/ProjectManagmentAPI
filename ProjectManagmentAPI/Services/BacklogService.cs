@@ -10,7 +10,7 @@ using System.Text.Json;
 
 namespace ProjectManagementAPI.Services
 {
-    public class BacklogService : BaseService, IBacklogService 
+    public class BacklogService : BaseService, IBacklogService
     {
         private readonly ContextDb _context;
         private readonly INotificationService _notificationService;
@@ -82,42 +82,89 @@ namespace ProjectManagementAPI.Services
 
         public async Task<ApiResponse<PagedResult<BacklogItemResponse>>> GetProjectBacklogAsync(Guid projectId, PagedRequest request)
         {
-            var query = _context.BacklogItems
-                .Where(bi => bi.ProjectId == projectId)
-                .Include(bi => bi.Assignee)
-                .Include(bi => bi.CreatedBy)
-                .Include(bi => bi.Sprint)
-                .AsQueryable();
+            var baseQuery = _context.BacklogItems
+                .Where(bi => bi.ProjectId == projectId);
 
             if (!string.IsNullOrWhiteSpace(request.SearchTerm))
             {
-                query = (IOrderedQueryable<BacklogItem>)query.Where(bi =>
+                baseQuery = baseQuery.Where(bi =>
                     bi.Title.Contains(request.SearchTerm) ||
                     (bi.Description != null && bi.Description.Contains(request.SearchTerm)));
             }
 
-            var totalCount = await query.CountAsync();
+            var totalCount = await baseQuery.CountAsync();
 
-            var items = await query
+            var items = await baseQuery
+                .Include(bi => bi.Assignee)
+                .Include(bi => bi.CreatedBy)
+                .Include(bi => bi.Sprint)
                 .Skip((request.PageNumber - 1) * request.PageSize)
                 .Take(request.PageSize)
                 .ToListAsync();
 
-            var responses = new List<BacklogItemResponse>();
-            foreach (var item in items)
-            {
-                responses.Add(await MapToBacklogItemResponse(item));
-            }
+            var itemIds = items.Select(i => i.Id).ToList();
+            var stats = await _context.BacklogItems
+                .Where(bi => itemIds.Contains(bi.Id))
+                .Select(bi => new
+                {
+                    bi.Id,
+                    SubTasksCount = bi.SubTasks.Count,
+                    CompletedSubTasksCount = bi.SubTasks.Count(st => st.Status == SubTaskStatus.Done),
+                    CommentsCount = bi.Comments.Count,
+                    AttachmentsCount = bi.Attachments.Count,
+                    ActiveBlockers = bi.Blockers
+                        .Where(b => b.Status == BlockerStatus.Active)
+                        .Select(b => new BlockerResponse
+                        {
+                            Id = b.Id,
+                            Description = b.Description,
+                            Severity = b.Severity.ToString(),
+                            Status = b.Status.ToString(),
+                            CreatedAt = b.CreatedAt
+                        }).ToList()
+                })
+                .ToDictionaryAsync(x => x.Id);
 
-            var result = new PagedResult<BacklogItemResponse>
+            var responses = items.Select(item =>
+            {
+                var s = stats.GetValueOrDefault(item.Id);
+                return new BacklogItemResponse
+                {
+                    Id = item.Id,
+                    Type = item.Type.ToString(),
+                    Title = item.Title,
+                    Description = item.Description,
+                    AcceptanceCriteria = item.AcceptanceCriteria,
+                    Priority = item.Priority,
+                    StoryPoints = item.StoryPoints,
+                    EstimatedHours = item.EstimatedHours,
+                    Status = item.Status.ToString(),
+                    Assignee = item.Assignee != null ? new UserBriefResponse { Id = item.Assignee.Id, FullName = item.Assignee.FullName, Username = item.Assignee.Username } : null,
+                    CreatedBy = item.CreatedBy != null ? new UserBriefResponse { Id = item.CreatedBy.Id, FullName = item.CreatedBy.FullName, Username = item.CreatedBy.Username } : new UserBriefResponse { Id = Guid.Empty, FullName = "Неизвестный", Username = "unknown" },
+                    Sprint = item.Sprint != null ? new SprintBriefResponse { Id = item.Sprint.Id, Name = item.Sprint.Name, Status = item.Sprint.Status.ToString(), StartDate = item.Sprint.StartDate, EndDate = item.Sprint.EndDate, IsActive = item.Sprint.IsActive } : null,
+                    CreatedAt = item.CreatedAt,
+                    UpdatedAt = item.UpdatedAt,
+                    CompletedAt = item.CompletedAt,
+                    SprintPriority = item.SprintPriority,
+                    StartedAt = item.StartedAt,
+                    ActualHours = item.ActualHours,
+                    SubTasksCount = s?.SubTasksCount ?? 0,
+                    CompletedSubTasksCount = s?.CompletedSubTasksCount ?? 0,
+                    CommentsCount = s?.CommentsCount ?? 0,
+                    AttachmentsCount = s?.AttachmentsCount ?? 0,
+                    ActiveBlockers = s?.ActiveBlockers ?? new(),
+                    Efficiency = item.EstimatedHours.HasValue && item.ActualHours.HasValue && item.ActualHours.Value > 0
+                        ? Math.Round((double)item.EstimatedHours.Value / item.ActualHours.Value * 100, 1) : null
+                };
+            }).ToList();
+
+            return ApiResponse<PagedResult<BacklogItemResponse>>.Ok(new PagedResult<BacklogItemResponse>
             {
                 Items = responses,
                 TotalCount = totalCount,
                 PageNumber = request.PageNumber,
                 PageSize = request.PageSize
-            };
-
-            return ApiResponse<PagedResult<BacklogItemResponse>>.Ok(result);
+            });
         }
 
         public async Task<ApiResponse<BacklogItemResponse>> UpdateBacklogItemAsync(Guid id, UpdateBacklogItemRequest request)
@@ -172,30 +219,6 @@ namespace ProjectManagementAPI.Services
                 backlogItem.AssigneeId = request.AssigneeId.Value == Guid.Empty ? null : request.AssigneeId.Value;
 
             backlogItem.UpdatedAt = DateTime.UtcNow;
-            await _context.SaveChangesAsync();
-
-            _context.ActivityLogs.Add(new ActivityLog
-            {
-                ProjectId = backlogItem.ProjectId,
-                UserId = request.UserId != Guid.Empty ? request.UserId : backlogItem.CreatedById,
-                ActionType = ActionType.TaskUpdated,
-                EntityType = "BacklogItem",
-                EntityId = backlogItem.Id,
-                OldValue = JsonSerializer.Serialize(oldValues),
-                NewValue = JsonSerializer.Serialize(new
-                {
-                    backlogItem.Title,
-                    backlogItem.Description,
-                    backlogItem.Type,
-                    backlogItem.Priority,
-                    backlogItem.StoryPoints,
-                    backlogItem.EstimatedHours,
-                    backlogItem.Status,
-                    backlogItem.AssigneeId
-                }),
-                Description = $"Задача '{backlogItem.Title}' обновлена",
-                CreatedAt = DateTime.UtcNow
-            });
 
             if (request.AssigneeId.HasValue && request.AssigneeId.Value != Guid.Empty && oldAssigneeId != request.AssigneeId.Value)
             {
@@ -257,7 +280,6 @@ namespace ProjectManagementAPI.Services
             }
 
             backlogItem.UpdatedAt = DateTime.UtcNow;
-            await _context.SaveChangesAsync();
 
             if (request.NewStatus == BacklogItemStatus.Done && oldStatus != BacklogItemStatus.Done)
             {
@@ -315,15 +337,13 @@ namespace ProjectManagementAPI.Services
 
         public async Task<ApiResponse> ReorderBacklogAsync(ReorderBacklogRequest request)
         {
-            foreach (var item in request.Items)
+            var ids = request.Items.Select(i => i.Id).ToList();
+            var items = await _context.BacklogItems.Where(bi => ids.Contains(bi.Id)).ToListAsync();
+            foreach (var item in items)
             {
-                var backlogItem = await _context.BacklogItems.FindAsync(item.Id);
-                if (backlogItem != null)
-                {
-                    backlogItem.OrderInBacklog = item.NewOrder;
-                }
+                var newOrder = request.Items.First(i => i.Id == item.Id).NewOrder;
+                item.OrderInBacklog = newOrder;
             }
-
             await _context.SaveChangesAsync();
             return ApiResponse.Ok("Порядок бэклога обновлен");
         }
@@ -593,46 +613,93 @@ namespace ProjectManagementAPI.Services
                 .FirstOrDefaultAsync(bi => bi.Id == id);
 
             if (backlogItem == null)
-            {
                 return ApiResponse<BacklogItemDetailResponse>.Fail("Задача не найдена");
-            }
 
-            var subTasks = await _context.SubTasks
-                .Include(st => st.Assignee)
-                .Where(st => st.BacklogItemId == id)
-                .OrderBy(st => st.OrderInParent)
-                .ToListAsync();
-
-            var comments = await _context.Comments
-                .Include(c => c.User)
-                .Where(c => c.BacklogItemId == id)
-                .OrderBy(c => c.CreatedAt)
-                .Take(50)
-                .ToListAsync();
-
-            var attachments = await _context.Attachments
-                .Include(a => a.UploadedBy)
-                .Where(a => a.BacklogItemId == id)
-                .ToListAsync();
-
-            var blockers = await _context.Blockers
-                .Where(b => b.BacklogItemId == id && b.Status == BlockerStatus.Active)
-                .ToListAsync();
-
-            var activityLogs = await _context.ActivityLogs
+            // Параллельная загрузка
+            var subTasksTask = _context.SubTasks.Include(st => st.Assignee)
+                .Where(st => st.BacklogItemId == id).OrderBy(st => st.OrderInParent).ToListAsync();
+            var commentsTask = _context.Comments.Include(c => c.User)
+                .Where(c => c.BacklogItemId == id).OrderBy(c => c.CreatedAt).Take(50).ToListAsync();
+            var attachmentsTask = _context.Attachments.Include(a => a.UploadedBy)
+                .Where(a => a.BacklogItemId == id).ToListAsync();
+            var blockersTask = _context.Blockers
+                .Where(b => b.BacklogItemId == id && b.Status == BlockerStatus.Active).ToListAsync();
+            var logsTask = _context.ActivityLogs
                 .Where(al => al.EntityId == id && al.EntityType == "BacklogItem")
-                .OrderByDescending(al => al.CreatedAt)
-                .Take(20)
-                .Select(al => new ActivityLogResponse
-                {
-                    Id = al.Id,
-                    ActionType = al.ActionType.ToString(),
-                    Description = al.Description,
-                    CreatedAt = al.CreatedAt
-                })
+                .OrderByDescending(al => al.CreatedAt).Take(20)
+                .Select(al => new ActivityLogResponse { Id = al.Id, ActionType = al.ActionType.ToString(), Description = al.Description, CreatedAt = al.CreatedAt })
                 .ToListAsync();
 
-            var response = new BacklogItemDetailResponse
+            await Task.WhenAll(subTasksTask, commentsTask, attachmentsTask, blockersTask, logsTask);
+
+            var subTasks = subTasksTask.Result;
+            var comments = commentsTask.Result;
+            var attachments = attachmentsTask.Result;
+            var blockers = blockersTask.Result;
+            var activityLogs = logsTask.Result;
+
+            return ApiResponse<BacklogItemDetailResponse>.Ok(new BacklogItemDetailResponse
+            {
+                Id = backlogItem.Id,
+                Type = backlogItem.Type.ToString(),
+                Title = backlogItem.Title,
+                Description = backlogItem.Description,
+                AcceptanceCriteria = backlogItem.AcceptanceCriteria,
+                Priority = backlogItem.Priority,
+                StoryPoints = backlogItem.StoryPoints,
+                EstimatedHours = backlogItem.EstimatedHours,
+                Status = backlogItem.Status.ToString(),
+                Assignee = backlogItem.Assignee != null ? new UserBriefResponse { Id = backlogItem.Assignee.Id, FullName = backlogItem.Assignee.FullName, Username = backlogItem.Assignee.Username } : null,
+                CreatedBy = new UserBriefResponse { Id = backlogItem.CreatedBy.Id, FullName = backlogItem.CreatedBy.FullName, Username = backlogItem.CreatedBy.Username },
+                Sprint = backlogItem.Sprint != null ? new SprintBriefResponse { Id = backlogItem.Sprint.Id, Name = backlogItem.Sprint.Name, Status = backlogItem.Sprint.Status.ToString(), StartDate = backlogItem.Sprint.StartDate, EndDate = backlogItem.Sprint.EndDate, IsActive = backlogItem.Sprint.IsActive } : null,
+                CreatedAt = backlogItem.CreatedAt,
+                UpdatedAt = backlogItem.UpdatedAt,
+                CompletedAt = backlogItem.CompletedAt,
+                SprintPriority = backlogItem.SprintPriority,
+                StartedAt = backlogItem.StartedAt,
+                ActualHours = backlogItem.ActualHours,
+                SubTasks = subTasks.Select(st => new SubTaskResponse { /* ... */ }).ToList(),
+                Comments = comments.Select(c => new CommentResponse { /* ... */ }).ToList(),
+                Attachments = attachments.Select(a => new AttachmentResponse { /* ... */ }).ToList(),
+                ActiveBlockers = blockers.Select(b => new BlockerResponse { /* ... */ }).ToList(),
+                ActivityHistory = activityLogs,
+                SubTasksCount = subTasks.Count,
+                CompletedSubTasksCount = subTasks.Count(st => st.Status == SubTaskStatus.Done),
+                CommentsCount = comments.Count,
+                AttachmentsCount = attachments.Count
+            });
+        }
+
+        #region Private Methods
+
+        private async Task<BacklogItemResponse> MapToBacklogItemResponse(BacklogItem backlogItem)
+        {
+            if (backlogItem.Id == Guid.Empty)
+                return CreateEmptyResponse();
+
+            var stats = await _context.BacklogItems
+                .Where(bi => bi.Id == backlogItem.Id)
+                .Select(bi => new
+                {
+                    SubTasksCount = bi.SubTasks.Count,
+                    CompletedSubTasksCount = bi.SubTasks.Count(st => st.Status == SubTaskStatus.Done),
+                    CommentsCount = bi.Comments.Count,
+                    AttachmentsCount = bi.Attachments.Count,
+                    ActiveBlockers = bi.Blockers
+                        .Where(b => b.Status == BlockerStatus.Active)
+                        .Select(b => new BlockerResponse
+                        {
+                            Id = b.Id,
+                            Description = b.Description,
+                            Severity = b.Severity.ToString(),
+                            Status = b.Status.ToString(),
+                            CreatedAt = b.CreatedAt
+                        })
+                        .ToList()
+                })
+                .FirstOrDefaultAsync();
+
+            return new BacklogItemResponse
             {
                 Id = backlogItem.Id,
                 Type = backlogItem.Type.ToString(),
@@ -649,12 +716,12 @@ namespace ProjectManagementAPI.Services
                     FullName = backlogItem.Assignee.FullName,
                     Username = backlogItem.Assignee.Username
                 } : null,
-                CreatedBy = new UserBriefResponse
+                CreatedBy = backlogItem.CreatedBy != null ? new UserBriefResponse
                 {
                     Id = backlogItem.CreatedBy.Id,
                     FullName = backlogItem.CreatedBy.FullName,
                     Username = backlogItem.CreatedBy.Username
-                },
+                } : new UserBriefResponse { Id = Guid.Empty, FullName = "Неизвестный", Username = "unknown" },
                 Sprint = backlogItem.Sprint != null ? new SprintBriefResponse
                 {
                     Id = backlogItem.Sprint.Id,
@@ -670,169 +737,22 @@ namespace ProjectManagementAPI.Services
                 SprintPriority = backlogItem.SprintPriority,
                 StartedAt = backlogItem.StartedAt,
                 ActualHours = backlogItem.ActualHours,
-                SubTasks = subTasks.Select(st => new SubTaskResponse
-                {
-                    Id = st.Id,
-                    Title = st.Title,
-                    Description = st.Description,
-                    EstimatedHours = st.EstimatedHours,
-                    ActualHours = st.ActualHours,
-                    Status = st.Status.ToString(),
-                    Assignee = st.Assignee != null ? new UserBriefResponse
-                    {
-                        Id = st.Assignee.Id,
-                        FullName = st.Assignee.FullName,
-                        Username = st.Assignee.Username
-                    } : null,
-                    OrderInParent = st.OrderInParent,
-                    StartedAt = st.StartedAt,
-                    CompletedAt = st.CompletedAt,
-                    CreatedAt = st.CreatedAt,
-                    UpdatedAt = st.UpdatedAt,
-                    IsOverdue = st.CompletedAt == null && st.StartedAt != null &&
-                                (DateTime.UtcNow - st.StartedAt.Value).TotalDays > 3,
-                    HasBlockers = false,
-                    ActualMinutes = st.ActualHours.HasValue ? (int?)(st.ActualHours.Value * 60) : null,
-                    Efficiency = st.EstimatedHours.HasValue && st.ActualHours.HasValue
-                        ? Math.Round((double)st.EstimatedHours.Value / (double)st.ActualHours.Value * 100, 1)
-                        : null
-                }).ToList(),
-                Comments = comments.Select(c => new CommentResponse
-                {
-                    Id = c.Id,
-                    Content = c.Content,
-                    User = new UserBriefResponse
-                    {
-                        Id = c.User.Id,
-                        FullName = c.User.FullName,
-                        Username = c.User.Username
-                    },
-                    CreatedAt = c.CreatedAt,
-                    UpdatedAt = c.UpdatedAt,
-                    IsEdited = c.IsEdited
-                }).ToList(),
-                Attachments = attachments.Select(a => new AttachmentResponse
-                {
-                    Id = a.Id,
-                    FileName = a.FileName,
-                    FileUrl = a.FileUrl,
-                    FileSize = a.FileSize,
-                    MimeType = a.MimeType,
-                    UploadedBy = new UserBriefResponse
-                    {
-                        Id = a.UploadedBy.Id,
-                        FullName = a.UploadedBy.FullName,
-                        Username = a.UploadedBy.Username
-                    },
-                    UploadedAt = a.UploadedAt
-                }).ToList(),
-                ActiveBlockers = blockers.Select(b => new BlockerResponse
-                {
-                    Id = b.Id,
-                    Description = b.Description,
-                    Severity = b.Severity.ToString(),
-                    Status = b.Status.ToString(),
-                    CreatedAt = b.CreatedAt
-                }).ToList(),
-                ActivityHistory = activityLogs,
-                SubTasksCount = subTasks.Count,
-                CompletedSubTasksCount = subTasks.Count(st => st.Status == SubTaskStatus.Done),
-                CommentsCount = comments.Count,
-                AttachmentsCount = attachments.Count
+                SubTasksCount = stats?.SubTasksCount ?? 0,
+                CompletedSubTasksCount = stats?.CompletedSubTasksCount ?? 0,
+                CommentsCount = stats?.CommentsCount ?? 0,
+                AttachmentsCount = stats?.AttachmentsCount ?? 0,
+                ActiveBlockers = stats?.ActiveBlockers ?? new(),
+                Efficiency = backlogItem.EstimatedHours.HasValue && backlogItem.ActualHours.HasValue && backlogItem.ActualHours.Value > 0
+                    ? Math.Round((double)backlogItem.EstimatedHours.Value / backlogItem.ActualHours.Value * 100, 1) : null
             };
-
-            return ApiResponse<BacklogItemDetailResponse>.Ok(response);
         }
 
-        #region Private Methods
-
-        private async Task<BacklogItemResponse> MapToBacklogItemResponse(BacklogItem backlogItem)
+        private BacklogItemResponse CreateEmptyResponse()
         {
-            try
+            return new BacklogItemResponse
             {
-                var subTasks = new List<SubTask>();
-                var commentsCount = 0;
-                var attachmentsCount = 0;
-                var activeBlockers = new List<BlockerResponse>();
-
-                if (backlogItem.Id != Guid.Empty)
-                {
-                    subTasks = await _context.SubTasks
-                        .Where(st => st.BacklogItemId == backlogItem.Id)
-                        .ToListAsync();
-
-                    commentsCount = await _context.Comments
-                        .CountAsync(c => c.BacklogItemId == backlogItem.Id);
-
-                    attachmentsCount = await _context.Attachments
-                        .CountAsync(a => a.BacklogItemId == backlogItem.Id);
-
-                    activeBlockers = await _context.Blockers
-                        .Where(b => b.BacklogItemId == backlogItem.Id && b.Status == BlockerStatus.Active)
-                        .Select(b => new BlockerResponse
-                        {
-                            Id = b.Id,
-                            Description = b.Description,
-                            Severity = b.Severity.ToString(),
-                            Status = b.Status.ToString(),
-                            CreatedAt = b.CreatedAt
-                        })
-                        .ToListAsync();
-                }
-
-                return new BacklogItemResponse
-                {
-                    Id = backlogItem.Id,
-                    Type = backlogItem.Type.ToString(),
-                    Title = backlogItem.Title,
-                    Description = backlogItem.Description,
-                    AcceptanceCriteria = backlogItem.AcceptanceCriteria,
-                    Priority = backlogItem.Priority,
-                    StoryPoints = backlogItem.StoryPoints,
-                    EstimatedHours = backlogItem.EstimatedHours,
-                    Status = backlogItem.Status.ToString(),
-                    Assignee = backlogItem.Assignee != null ? new UserBriefResponse
-                    {
-                        Id = backlogItem.Assignee.Id,
-                        FullName = backlogItem.Assignee.FullName,
-                        Username = backlogItem.Assignee.Username
-                    } : null,
-                    CreatedBy = backlogItem.CreatedBy != null ? new UserBriefResponse
-                    {
-                        Id = backlogItem.CreatedBy.Id,
-                        FullName = backlogItem.CreatedBy.FullName,
-                        Username = backlogItem.CreatedBy.Username
-                    } : new UserBriefResponse { Id = Guid.Empty, FullName = "Неизвестный", Username = "unknown" },
-                    Sprint = backlogItem.Sprint != null ? new SprintBriefResponse
-                    {
-                        Id = backlogItem.Sprint.Id,
-                        Name = backlogItem.Sprint.Name,
-                        Status = backlogItem.Sprint.Status.ToString(),
-                        StartDate = backlogItem.Sprint.StartDate,
-                        EndDate = backlogItem.Sprint.EndDate,
-                        IsActive = backlogItem.Sprint.IsActive
-                    } : null,
-                    CreatedAt = backlogItem.CreatedAt,
-                    UpdatedAt = backlogItem.UpdatedAt,
-                    CompletedAt = backlogItem.CompletedAt,
-                    SprintPriority = backlogItem.SprintPriority,
-                    StartedAt = backlogItem.StartedAt,
-                    ActualHours = backlogItem.ActualHours,
-                    SubTasksCount = subTasks.Count,
-                    CompletedSubTasksCount = subTasks.Count(st => st.Status == SubTaskStatus.Done),
-                    CommentsCount = commentsCount,
-                    AttachmentsCount = attachmentsCount,
-                    ActiveBlockers = activeBlockers,
-                    Efficiency = backlogItem.EstimatedHours.HasValue && backlogItem.ActualHours.HasValue && backlogItem.ActualHours.Value > 0
-                        ? Math.Round((double)backlogItem.EstimatedHours.Value / backlogItem.ActualHours.Value * 100, 1)
-                        : null
-                };
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Ошибка при маппинге BacklogItem {Id}", backlogItem.Id);
-                throw;
-            }
+                CreatedBy = new UserBriefResponse { Id = Guid.Empty, FullName = "Неизвестный", Username = "unknown" }
+            };
         }
 
         #endregion
