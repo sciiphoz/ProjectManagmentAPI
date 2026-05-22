@@ -43,6 +43,7 @@ namespace ProjectManagementAPI.DTO.Responses
         public int Priority { get; set; }
         public decimal? StoryPoints { get; set; }
         public decimal? EstimatedHours { get; set; }
+        public List<BlockerResponse> ActiveBlockers { get; set; } = new();
         public UserBriefResponse? Assignee { get; set; }
         public bool HasBlockers { get; set; }
         public int SubTasksCount { get; set; }

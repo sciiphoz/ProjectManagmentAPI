@@ -7,6 +7,7 @@ using ProjectManagementAPI.Interfaces;
 using ProjectManagementAPI.Models;
 using ProjectManagementAPI.Enums;
 
+
 namespace ProjectManagementAPI.Services
 {
     public class SprintService : BaseService, ISprintService
@@ -396,6 +397,16 @@ namespace ProjectManagementAPI.Services
                             Username = bi.Assignee.Username
                         } : null,
                         HasBlockers = bi.Blockers.Any(b => b.Status == BlockerStatus.Active),
+                        ActiveBlockers = bi.Blockers
+                            .Where(b => b.Status == BlockerStatus.Active)
+                            .Select(b => new BlockerResponse
+                            {
+                                Id = b.Id,
+                                Description = b.Description,
+                                Severity = b.Severity.ToString(),
+                                Status = b.Status.ToString(),
+                                CreatedAt = b.CreatedAt
+                            }).ToList(),
                         SubTasksCount = bi.SubTasks.Count,
                         CompletedSubTasksCount = bi.SubTasks.Count(st => st.Status == SubTaskStatus.Done)
                     })

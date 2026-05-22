@@ -4616,6 +4616,13 @@
             "format": "double",
             "nullable": true
           },
+          "activeBlockers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BlockerResponse"
+            },
+            "nullable": true
+          },
           "assignee": {
             "$ref": "#/components/schemas/UserBriefResponse"
           },
