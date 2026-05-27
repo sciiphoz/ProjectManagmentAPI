@@ -227,7 +227,7 @@ namespace ProjectManagementAPI.Services
                     "Назначена задача",
                     $"Вам назначена задача '{backlogItem.Title}' в проекте '{project.Name}'",
                     "Info",
-                    $"/backlog/{backlogItem.Id}",
+                    $"/sprints/{backlogItem.SprintId}/{backlogItem.Id}",
                     backlogItem.Id,
                     "BacklogItem"
                 );
@@ -306,11 +306,11 @@ namespace ProjectManagementAPI.Services
                     if (scrumMasterId != backlogItem.AssigneeId && scrumMasterId != backlogItem.CreatedById)
                     {
                         await _notificationService.CreateNotificationAsync(
-                            scrumMasterId,
+                            backlogItem.CreatedById,
                             "Задача выполнена",
-                            $"Задача '{backlogItem.Title}' в проекте выполнена",
+                            $"Задача '{backlogItem.Title}' выполнена",
                             "Success",
-                            $"/backlog/{backlogItem.Id}",
+                            $"/sprints/{backlogItem.SprintId}/{backlogItem.Id}",
                             backlogItem.Id,
                             "BacklogItem"
                         );
@@ -377,7 +377,7 @@ namespace ProjectManagementAPI.Services
                         "Новый комментарий к задаче",
                         $"Пользователь {user?.FullName ?? "Кто-то"} оставил комментарий к задаче «{backlogItem.Title}»",
                         "Info",
-                        $"/backlog/{backlogItem.Id}",
+                        $"/sprints/{backlogItem.SprintId}/{backlogItem.Id}",
                         backlogItem.Id,
                         "BacklogItem"
                     );
