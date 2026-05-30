@@ -13,5 +13,15 @@ namespace ProjectManagementAPI.Hubs
         {
             await Groups.RemoveFromGroupAsync(Context.ConnectionId, taskId);
         }
+
+        public async Task SubscribeToRetro(string sprintId)
+        {
+            await Groups.AddToGroupAsync(Context.ConnectionId, $"retro-{sprintId}");
+        }
+
+        public async Task UnsubscribeFromRetro(string sprintId)
+        {
+            await Groups.RemoveFromGroupAsync(Context.ConnectionId, $"retro-{sprintId}");
+        }
     }
 }

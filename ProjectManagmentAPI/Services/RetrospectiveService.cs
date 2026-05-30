@@ -1,8 +1,10 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.AspNetCore.SignalR;
+using Microsoft.EntityFrameworkCore;
 using ProjectManagementAPI.DataBaseContext;
 using ProjectManagementAPI.DTO.Common;
 using ProjectManagementAPI.DTO.Responses;
 using ProjectManagementAPI.Enums;
+using ProjectManagementAPI.Hubs;
 using ProjectManagementAPI.Interfaces;
 using ProjectManagementAPI.Models;
 using System;
@@ -12,12 +14,13 @@ namespace ProjectManagementAPI.Services
     public class RetrospectiveService : BaseService, IRetrospectiveService
     {
         private readonly ContextDb _context;
+        private readonly IHubContext<CommentHub> _hubContext;
 
-        public RetrospectiveService(ContextDb context, ILogger<RetrospectiveService> logger) : base(logger)
+        public RetrospectiveService(ContextDb context, IHubContext<CommentHub> hubContext, ILogger<RetrospectiveService> logger) : base(logger)
         {
             _context = context;
+            _hubContext = hubContext;
         }
-
         public async Task<ApiResponse<RetrospectiveBoardResponse>> GetRetrospectiveBoardAsync(Guid sprintId, Guid currentUserId)
         {
             try
@@ -106,7 +109,6 @@ namespace ProjectManagementAPI.Services
                 };
 
                 _context.RetrospectiveItems.Add(item);
-                await _context.SaveChangesAsync();
 
                 var response = new RetrospectiveItemResponse
                 {
@@ -124,7 +126,10 @@ namespace ProjectManagementAPI.Services
                     HasUserVoted = false
                 };
 
+                await _context.SaveChangesAsync();
+                await _hubContext.Clients.Group($"retro-{sprintId}").SendAsync("RetroItemAdded", response);
                 return ApiResponse<RetrospectiveItemResponse>.Ok(response, "Элемент добавлен");
+
             }
             catch (Exception ex)
             {
@@ -163,6 +168,9 @@ namespace ProjectManagementAPI.Services
                 item.VoteCount++;
                 await _context.SaveChangesAsync();
 
+                var updatedItem = MapToResponse(item, true);
+                await _hubContext.Clients.Group($"retro-{item.SprintId}")
+                    .SendAsync("RetroVoteUpdated", updatedItem);
                 return ApiResponse.Ok("Голос добавлен");
             }
             catch (Exception ex)
@@ -193,6 +201,9 @@ namespace ProjectManagementAPI.Services
                 _context.RetrospectiveVotes.Remove(vote);
                 await _context.SaveChangesAsync();
 
+                var updatedItem = MapToResponse(item, false);
+                await _hubContext.Clients.Group($"retro-{item.SprintId}")
+                    .SendAsync("RetroVoteUpdated", updatedItem);
                 return ApiResponse.Ok("Голос удален");
             }
             catch (Exception ex)
@@ -214,6 +225,8 @@ namespace ProjectManagementAPI.Services
                 {
                     return ApiResponse.Fail("Элемент не найден");
                 }
+
+                var sprintId = item.SprintId; // ← сохраняем до удаления
 
                 var isCreator = item.CreatedById == userId;
 
@@ -237,6 +250,7 @@ namespace ProjectManagementAPI.Services
                 _context.RetrospectiveItems.Remove(item);
                 await _context.SaveChangesAsync();
 
+                await _hubContext.Clients.Group($"retro-{sprintId}").SendAsync("RetroItemDeleted", itemId);
                 return ApiResponse.Ok("Элемент удален");
             }
             catch (Exception ex)
