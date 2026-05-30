@@ -90,6 +90,92 @@ namespace ProjectManagementAPI.Services
             }
         }
 
+        public async Task<ApiResponse<List<SuggestedMemberResponse>>> GetSuggestedMembersAsync(Guid projectId, Guid currentUserId)
+        {
+            try
+            {
+                var invitedEmails = await _context.ProjectInvitations
+                    .Where(i => i.ProjectId == projectId && !i.IsAccepted && i.ExpiresAt > DateTime.UtcNow)
+                    .Select(i => i.Email.ToLower())
+                    .ToListAsync();
+
+                var memberIds = await _context.ProjectMembers
+                    .Where(pm => pm.ProjectId == projectId)
+                    .Select(pm => pm.UserId)
+                    .ToListAsync();
+
+                var myProjectIds = await _context.ProjectMembers
+                    .Where(pm => pm.UserId == currentUserId)
+                    .Select(pm => pm.ProjectId)
+                    .ToListAsync();
+
+                var result = new List<SuggestedMemberResponse>();
+
+                var devs = await _context.ProjectMembers
+                    .Where(pm => myProjectIds.Contains(pm.ProjectId)
+                        && pm.UserId != currentUserId
+                        && !memberIds.Contains(pm.UserId)
+                        && pm.RoleInProject == ProjectRole.Developer)
+                    .Select(pm => new SuggestedMemberResponse
+                    {
+                        UserId = pm.UserId,
+                        FullName = pm.User.FullName,
+                        Email = pm.User.Email,
+                        CurrentTasks = 0,
+                        CommonProjectName = pm.Project.Name
+                    })
+                    .Take(10)
+                    .ToListAsync();
+
+                result = devs
+                    .Where(d => !invitedEmails.Contains(d.Email.ToLower()))
+                    .DistinctBy(d => d.UserId)
+                    .Take(10)
+                    .ToList();
+
+                if (result.Count < 10)
+                {
+                    var existingIds = result.Select(s => s.UserId).ToList();
+
+                    var randomUsers = await _context.Users
+                        .Where(u => u.Id != currentUserId
+                            && !memberIds.Contains(u.Id)
+                            && !invitedEmails.Contains(u.Email.ToLower())
+                            && !existingIds.Contains(u.Id))
+                        .Take(20)
+                        .ToListAsync();
+
+                    var random = new Random();
+                    randomUsers = randomUsers.OrderBy(u => random.Next()).ToList();
+
+                    foreach (var user in randomUsers)
+                    {
+                        var projectName = await _context.ProjectMembers
+                            .Where(pm => pm.UserId == user.Id)
+                            .Select(pm => pm.Project.Name)
+                            .FirstOrDefaultAsync() ?? "—";
+
+                        result.Add(new SuggestedMemberResponse
+                        {
+                            UserId = user.Id,
+                            FullName = user.FullName,
+                            Email = user.Email,
+                            CurrentTasks = 0,
+                            CommonProjectName = projectName
+                        });
+
+                        if (result.Count >= 10) break;
+                    }
+                }
+
+                return ApiResponse<List<SuggestedMemberResponse>>.Ok(result.Take(10).ToList());
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Ошибка в GetSuggestedMembers");
+                return ApiResponse<List<SuggestedMemberResponse>>.Fail("Ошибка загрузки предложений");
+            }
+        }
         public async Task<ApiResponse<PagedResult<ProjectResponse>>> GetUserProjectsAsync(Guid userId, PagedRequest request)
         {
             try

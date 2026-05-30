@@ -1,11 +1,13 @@
-﻿using Microsoft.EntityFrameworkCore;
-using ProjectManagementAPI.Models;
-using ProjectManagementAPI.DTO.Common;
-using ProjectManagementAPI.DTO.Responses;
-using ProjectManagementAPI.Interfaces;
+﻿using Microsoft.AspNetCore.SignalR;
+using Microsoft.EntityFrameworkCore;
 using ProjectManagementAPI.DataBaseContext;
-using ProjectManagementAPI.Enums;
+using ProjectManagementAPI.DTO.Common;
 using ProjectManagementAPI.DTO.Requests;
+using ProjectManagementAPI.DTO.Responses;
+using ProjectManagementAPI.Enums;
+using ProjectManagementAPI.Hubs;
+using ProjectManagementAPI.Interfaces;
+using ProjectManagementAPI.Models;
 using System.Text.Json;
 
 namespace ProjectManagementAPI.Services
@@ -14,11 +16,14 @@ namespace ProjectManagementAPI.Services
     {
         private readonly ContextDb _context;
         private readonly INotificationService _notificationService;
+        private readonly IHubContext<CommentHub> _hubContext;
 
-        public BacklogService(ContextDb context, INotificationService notificationService, ILogger<UserService> logger) : base(logger)
+        public BacklogService(ContextDb context, INotificationService notificationService,
+            IHubContext<CommentHub> hubContext, ILogger<UserService> logger) : base(logger)
         {
             _context = context;
             _notificationService = notificationService;
+            _hubContext = hubContext;
         }
 
         public async Task<ApiResponse<BacklogItemResponse>> CreateBacklogItemAsync(CreateBacklogItemRequest request)
@@ -366,7 +371,6 @@ namespace ProjectManagementAPI.Services
                 };
 
                 _context.Comments.Add(comment);
-                await _context.SaveChangesAsync();
 
                 var user = await _context.Users.FindAsync(userId);
 
@@ -386,6 +390,7 @@ namespace ProjectManagementAPI.Services
                 var response = new CommentResponse
                 {
                     Id = comment.Id,
+                    BacklogItemId = backlogItemId,  // ← добавить
                     Content = comment.Content,
                     CreatedAt = comment.CreatedAt,
                     User = new UserBriefResponse
@@ -396,6 +401,8 @@ namespace ProjectManagementAPI.Services
                     }
                 };
 
+                await _context.SaveChangesAsync();
+                await _hubContext.Clients.Group(backlogItemId.ToString()).SendAsync("CommentAdded", response);
                 return ApiResponse<CommentResponse>.Ok(response);
             }
             catch (Exception ex)

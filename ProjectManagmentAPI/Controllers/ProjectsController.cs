@@ -123,6 +123,14 @@ namespace ProjectManagementAPI.Controllers
             return Ok(response);
         }
 
+        [HttpGet("{projectId}/suggested-members")]
+        public async Task<ActionResult<ApiResponse<List<SuggestedMemberResponse>>>> GetSuggestedMembers(Guid projectId)
+        {
+            var userId = User.GetUserId();
+            var response = await _projectService.GetSuggestedMembersAsync(projectId, userId);
+            return Ok(response);
+        }
+
         [HttpGet("invitations/check")]
         [AllowAnonymous]
         public async Task<ActionResult<ApiResponse<ProjectInvitationStatus>>> CheckInvitation([FromQuery] string token)

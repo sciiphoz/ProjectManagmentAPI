@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using ProjectManagementAPI.DataBaseContext;
 using ProjectManagementAPI.Filter;
+using ProjectManagementAPI.Hubs;
 using ProjectManagementAPI.Interfaces;
 using ProjectManagementAPI.Services;
 using System.Text;
@@ -59,6 +60,9 @@ builder.Services.AddScoped<IRetrospectiveService, RetrospectiveService>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddScoped<IPasswordHasher, PasswordHasher>();
 builder.Services.AddScoped<IEmailService, EmailService>();
+builder.Services.AddHostedService<DeadlineNotificationService>();
+
+builder.Services.AddSignalR();
 
 builder.Services.AddCors(options =>
 {
@@ -90,6 +94,7 @@ app.UseCors("AllowBlazor");
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
+app.MapHub<CommentHub>("/hubs/comments");
 
 using (var scope = app.Services.CreateScope())
 {

@@ -463,8 +463,7 @@ namespace ProjectManagementAPI.Services
 
                 _logger.LogInformation($"Изменение статуса задачи {taskId}: {task.Status} -> {status}");
 
-                // Проверка для Done
-                if (status == BacklogItemStatus.Done)
+                if (status == BacklogItemStatus.Review)
                 {
                     var subTasks = await _context.SubTasks
                         .Where(st => st.BacklogItemId == taskId)

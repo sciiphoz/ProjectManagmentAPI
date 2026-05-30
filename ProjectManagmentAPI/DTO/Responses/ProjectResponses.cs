@@ -48,4 +48,14 @@ namespace ProjectManagementAPI.DTO.Responses
         public int CompletedStoryPoints { get; set; }
         public double CompletionPercentage { get; set; }
     }
+
+    public class SuggestedMemberResponse
+    {
+        public Guid UserId { get; set; }
+        public string FullName { get; set; } = string.Empty;
+        public string Email { get; set; } = string.Empty;
+        public int CurrentTasks { get; set; }
+        public string CommonProjectName { get; set; } = string.Empty;
+        public Guid CommonProjectId { get; set; }
+    }
 }

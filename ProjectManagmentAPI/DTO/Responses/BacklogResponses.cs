@@ -62,6 +62,7 @@ namespace ProjectManagementAPI.DTO.Responses
     public class CommentResponse
     {
         public Guid Id { get; set; }
+        public Guid BacklogItemId { get; set; }
         public string Content { get; set; } = string.Empty;
         public UserBriefResponse User { get; set; } = null!;
         public List<UserBriefResponse> MentionedUsers { get; set; } = new();
