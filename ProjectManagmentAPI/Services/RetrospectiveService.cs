@@ -142,7 +142,10 @@ namespace ProjectManagementAPI.Services
         {
             try
             {
-                var item = await _context.RetrospectiveItems.FindAsync(itemId);
+                var item = await _context.RetrospectiveItems
+                    .Include(i => i.CreatedBy)
+                    .FirstOrDefaultAsync(i => i.Id == itemId);
+
                 if (item == null)
                 {
                     return ApiResponse.Fail("Элемент не найден");
@@ -168,7 +171,22 @@ namespace ProjectManagementAPI.Services
                 item.VoteCount++;
                 await _context.SaveChangesAsync();
 
-                var updatedItem = MapToResponse(item, true);
+                var updatedItem = new RetrospectiveItemResponse
+                {
+                    Id = item.Id,
+                    Category = item.Category,
+                    Content = item.Content,
+                    VoteCount = item.VoteCount,
+                    CreatedBy = new UserBriefResponse
+                    {
+                        Id = item.CreatedBy?.Id ?? item.CreatedById,
+                        FullName = item.CreatedBy?.FullName ?? "Участник",
+                        Username = item.CreatedBy?.Username ?? "user"
+                    },
+                    CreatedAt = item.CreatedAt,
+                    HasUserVoted = false
+                };
+
                 await _hubContext.Clients.Group($"retro-{item.SprintId}")
                     .SendAsync("RetroVoteUpdated", updatedItem);
                 return ApiResponse.Ok("Голос добавлен");
@@ -191,8 +209,11 @@ namespace ProjectManagementAPI.Services
                 {
                     return ApiResponse.Fail("Голос не найден");
                 }
+                
+                var item = await _context.RetrospectiveItems
+                    .Include(i => i.CreatedBy)
+                    .FirstOrDefaultAsync(i => i.Id == itemId);
 
-                var item = await _context.RetrospectiveItems.FindAsync(itemId);
                 if (item != null)
                 {
                     item.VoteCount = Math.Max(0, item.VoteCount - 1);
@@ -201,7 +222,22 @@ namespace ProjectManagementAPI.Services
                 _context.RetrospectiveVotes.Remove(vote);
                 await _context.SaveChangesAsync();
 
-                var updatedItem = MapToResponse(item, false);
+                var updatedItem = new RetrospectiveItemResponse
+                {
+                    Id = item.Id,
+                    Category = item.Category,
+                    Content = item.Content,
+                    VoteCount = item.VoteCount,
+                    CreatedBy = new UserBriefResponse
+                    {
+                        Id = item.CreatedBy?.Id ?? item.CreatedById,
+                        FullName = item.CreatedBy?.FullName ?? "Участник",
+                        Username = item.CreatedBy?.Username ?? "user"
+                    },
+                    CreatedAt = item.CreatedAt,
+                    HasUserVoted = false
+                };
+
                 await _hubContext.Clients.Group($"retro-{item.SprintId}")
                     .SendAsync("RetroVoteUpdated", updatedItem);
                 return ApiResponse.Ok("Голос удален");
@@ -226,7 +262,7 @@ namespace ProjectManagementAPI.Services
                     return ApiResponse.Fail("Элемент не найден");
                 }
 
-                var sprintId = item.SprintId; // ← сохраняем до удаления
+                var sprintId = item.SprintId; 
 
                 var isCreator = item.CreatedById == userId;
 
@@ -270,11 +306,16 @@ namespace ProjectManagementAPI.Services
                 Category = item.Category,
                 Content = item.Content,
                 VoteCount = item.VoteCount,
-                CreatedBy = new UserBriefResponse
+                CreatedBy = item.CreatedBy != null ? new UserBriefResponse
                 {
                     Id = item.CreatedBy.Id,
                     FullName = item.CreatedBy.FullName,
                     Username = item.CreatedBy.Username
+                } : new UserBriefResponse
+                {
+                    Id = item.CreatedById,
+                    FullName = "Участник",
+                    Username = "user"
                 },
                 CreatedAt = item.CreatedAt,
                 HasUserVoted = hasUserVoted

@@ -68,7 +68,7 @@
               "RelativeDocumentMoniker": "ProjectManagmentAPI\\Services\\RetrospectiveService.cs",
               "ToolTip": "C:\\Users\\sciiphoz\\source\\repos\\ProjectManagmentAPI\\ProjectManagmentAPI\\Services\\RetrospectiveService.cs",
               "RelativeToolTip": "ProjectManagmentAPI\\Services\\RetrospectiveService.cs",
-              "ViewState": "AgIAAOcAAAAAAAAAAAAUwAQBAAAJAAAAAAAAAA==",
+              "ViewState": "AgIAAKQAAAAAAAAAAAAowLoAAAAoAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2026-05-30T20:20:26.925Z",
               "EditorCaption": ""
@@ -83,8 +83,7 @@
               "RelativeToolTip": "ProjectManagmentAPI\\Services\\ProjectService.cs",
               "ViewState": "AgIAAF0AAAAAAAAAAAAUwGAAAAAnAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-05-30T09:31:45.531Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-05-30T09:31:45.531Z"
             },
             {
               "$type": "Document",
@@ -144,8 +143,7 @@
               "RelativeToolTip": "ProjectManagmentAPI\\Hubs\\CommentHub.cs",
               "ViewState": "AgIAAAAAAAAAAAAAAAAAABAAAAA3AAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-05-28T11:22:39.426Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-05-28T11:22:39.426Z"
             },
             {
               "$type": "Document",
