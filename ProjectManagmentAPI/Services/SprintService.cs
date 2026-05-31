@@ -6,6 +6,8 @@ using ProjectManagementAPI.DTO.Responses;
 using ProjectManagementAPI.Interfaces;
 using ProjectManagementAPI.Models;
 using ProjectManagementAPI.Enums;
+using ProjectManagementAPI.Hubs;
+using Microsoft.AspNetCore.SignalR;
 
 
 namespace ProjectManagementAPI.Services
@@ -14,14 +16,17 @@ namespace ProjectManagementAPI.Services
     {
         private readonly ContextDb _context;
         private readonly INotificationService _notificationService;
+        private readonly IHubContext<CommentHub> _hubContext;
 
         public SprintService(
             ContextDb context,
             INotificationService notificationService,
+            IHubContext<CommentHub> hubContext,
             ILogger<SprintService> logger) : base(logger)
         {
             _context = context;
             _notificationService = notificationService;
+            _hubContext = hubContext;
         }
 
         public async Task<ApiResponse<SprintResponse>> CreateSprintAsync(CreateSprintRequest request)
@@ -514,6 +519,55 @@ namespace ProjectManagementAPI.Services
                 });
 
                 await _context.SaveChangesAsync();
+                var updatedTask = new BacklogItemBoardResponse
+                {
+                    Id = task.Id,
+                    Title = task.Title,
+                    Type = task.Type.ToString(),
+                    Status = task.Status.ToString(),
+                    Priority = task.Priority,
+                    StoryPoints = task.StoryPoints,
+                    EstimatedHours = task.EstimatedHours,
+                    Assignee = task.Assignee != null ? new UserBriefResponse
+                    {
+                        Id = task.Assignee.Id,
+                        FullName = task.Assignee.FullName,
+                        Username = task.Assignee.Username
+                    } : null,
+                    HasBlockers = await _context.Blockers.AnyAsync(b => b.BacklogItemId == taskId && b.Status == BlockerStatus.Active),
+                    SubTasksCount = await _context.SubTasks.CountAsync(st => st.BacklogItemId == taskId),
+                    CompletedSubTasksCount = await _context.SubTasks.CountAsync(st => st.BacklogItemId == taskId && st.Status == SubTaskStatus.Done)
+                };
+
+                await _hubContext.Clients.Group($"sprint-{task.SprintId}")
+                    .SendAsync("TaskStatusUpdated", updatedTask);
+
+                if (status == BacklogItemStatus.Review && oldStatus != BacklogItemStatus.Review)
+                {
+                    var sprint = await _context.Sprints.FindAsync(task.SprintId);
+                    if (sprint != null)
+                    {
+                        var scrumMasters = await _context.ProjectMembers
+                            .Where(pm => pm.ProjectId == sprint.ProjectId && pm.RoleInProject == ProjectRole.ScrumMaster)
+                            .Select(pm => pm.UserId)
+                            .ToListAsync();
+
+                        var developerName = task.Assignee?.FullName ?? "Разработчик";
+
+                        foreach (var smId in scrumMasters)
+                        {
+                            await _notificationService.CreateNotificationAsync(
+                                smId,
+                                "Задача на проверке",
+                                $"Задача «{task.Title}» перемещена в статус «На проверке» исполнителем {developerName}.",
+                                "Info",
+                                $"/sprints/{task.SprintId}/{task.Id}",
+                                task.Id,
+                                "BacklogItem"
+                            );
+                        }
+                    }
+                }
 
                 return ApiResponse.Ok("Статус задачи обновлен");
             }
