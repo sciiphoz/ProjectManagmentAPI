@@ -5,10 +5,10 @@ namespace ProjectManagementAPI.DataBaseContext
 {
     public class ContextDb : DbContext
     {
-        public ContextDb(DbContextOptions<ContextDb> options)
-            : base(options)
+        public ContextDb(DbContextOptions<ContextDb> options) : base(options)
         {
-            Database.SetCommandTimeout(120);
+            if (Database.IsRelational())
+                Database.SetCommandTimeout(120);
         }
 
         public DbSet<User> Users { get; set; }

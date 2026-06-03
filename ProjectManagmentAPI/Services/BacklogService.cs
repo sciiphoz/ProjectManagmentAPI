@@ -372,7 +372,7 @@ namespace ProjectManagementAPI.Services
 
                 _context.Comments.Add(comment);
 
-                var user = await _context.Users.FindAsync(userId);
+                var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId);
 
                 if (backlogItem.AssigneeId.HasValue && backlogItem.AssigneeId.Value != userId)
                 {
@@ -390,7 +390,7 @@ namespace ProjectManagementAPI.Services
                 var response = new CommentResponse
                 {
                     Id = comment.Id,
-                    BacklogItemId = backlogItemId,  // ← добавить
+                    BacklogItemId = backlogItemId, 
                     Content = comment.Content,
                     CreatedAt = comment.CreatedAt,
                     User = new UserBriefResponse
