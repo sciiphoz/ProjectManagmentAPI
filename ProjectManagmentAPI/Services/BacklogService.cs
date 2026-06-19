@@ -635,7 +635,6 @@ namespace ProjectManagementAPI.Services
             if (backlogItem == null)
                 return ApiResponse<BacklogItemDetailResponse>.Fail("Задача не найдена");
 
-            // Последовательная загрузка (без Task.WhenAll)
             var subTasks = await _context.SubTasks
                 .Include(st => st.Assignee)
                 .Where(st => st.BacklogItemId == id)
