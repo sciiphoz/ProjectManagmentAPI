@@ -701,68 +701,118 @@ namespace ProjectManagementAPI.Services
                     return ApiResponse<List<BurndownPoint>>.Fail("Спринт не найден");
                 }
 
-                var burndownPoints = new List<BurndownPoint>();
+                // Собираем все единицы работы: задачи и подзадачи (все, без исключений)
+                var workItems = new List<WorkItem>();
 
-                var totalHours = sprint.BacklogItems
-                    .Sum(bi => bi.EstimatedHours ?? 0) +
-                    sprint.BacklogItems
-                        .SelectMany(bi => bi.SubTasks)
-                        .Sum(st => st.EstimatedHours ?? 0);
+                foreach (var task in sprint.BacklogItems)
+                {
+                    // Добавляем саму задачу
+                    workItems.Add(new WorkItem
+                    {
+                        EstimatedHours = task.EstimatedHours ?? 0,
+                        CreatedAt = task.CreatedAt.Date,
+                        CompletedAt = task.Status == BacklogItemStatus.Done ? task.CompletedAt?.Date : null,
+                        IsCompleted = task.Status == BacklogItemStatus.Done
+                    });
 
-                if (totalHours == 0)
+                    // Добавляем все подзадачи
+                    foreach (var sub in task.SubTasks)
+                    {
+                        workItems.Add(new WorkItem
+                        {
+                            EstimatedHours = sub.EstimatedHours ?? 0,
+                            CreatedAt = sub.CreatedAt.Date,
+                            CompletedAt = sub.Status == SubTaskStatus.Done ? sub.CompletedAt?.Date : null,
+                            IsCompleted = sub.Status == SubTaskStatus.Done
+                        });
+                    }
+                }
+
+                if (workItems.Count == 0)
                 {
                     return ApiResponse<List<BurndownPoint>>.Ok(new List<BurndownPoint>(), "Нет данных для графика");
                 }
 
-                var days = (sprint.EndDate - sprint.StartDate).Days;
+                var startDate = sprint.StartDate.Date;
+                var endDate = sprint.EndDate.Date;
+                var days = (endDate - startDate).Days;
                 if (days <= 0) days = 1;
 
-                var dailyIdealBurn = totalHours / days;
-
-                var completedHoursPerDay = new Dictionary<DateTime, decimal>();
-
-                foreach (var task in sprint.BacklogItems.Where(bi => bi.Status == BacklogItemStatus.Done && bi.CompletedAt.HasValue))
+                // Если спринт завершён, проставляем дату завершения для всех выполненных элементов, у которых её нет
+                if (sprint.Status == SprintStatus.Completed)
                 {
-                    var completedDate = task.CompletedAt!.Value.Date;
-                    var taskHours = (task.EstimatedHours ?? 0) + task.SubTasks.Sum(st => st.EstimatedHours ?? 0);
-
-                    if (!completedHoursPerDay.ContainsKey(completedDate))
-                        completedHoursPerDay[completedDate] = 0;
-
-                    completedHoursPerDay[completedDate] += taskHours;
+                    foreach (var item in workItems.Where(w => w.IsCompleted && !w.CompletedAt.HasValue))
+                    {
+                        item.CompletedAt = endDate;
+                    }
                 }
 
-                var remaining = totalHours;
-                var currentDate = sprint.StartDate.Date;
+                // Начальные часы: сумма часов элементов, созданных до или в день старта
+                var initialHours = workItems
+                    .Where(w => w.CreatedAt <= startDate)
+                    .Sum(w => w.EstimatedHours);
 
-                while (currentDate <= sprint.EndDate.Date)
+                // Часы, завершённые до или в день старта
+                var completedBeforeStart = workItems
+                    .Where(w => w.IsCompleted && w.CompletedAt.HasValue && w.CompletedAt.Value <= startDate)
+                    .Sum(w => w.EstimatedHours);
+
+                var currentHours = initialHours - completedBeforeStart;
+                if (currentHours < 0) currentHours = 0;
+
+                // Идеальная линия строится от initialHours до 0 (не меняется при добавлении новых часов)
+                var idealStartHours = initialHours;
+
+                var points = new List<BurndownPoint>();
+
+                for (int i = 0; i <= days; i++)
                 {
-                    if (completedHoursPerDay.ContainsKey(currentDate))
+                    var currentDate = startDate.AddDays(i);
+
+                    if (i > 0)
                     {
-                        remaining -= completedHoursPerDay[currentDate];
+                        // Добавляем часы элементов, созданных в этот день
+                        var createdToday = workItems
+                            .Where(w => w.CreatedAt == currentDate)
+                            .Sum(w => w.EstimatedHours);
+                        currentHours += createdToday;
+
+                        // Вычитаем часы элементов, завершённых в этот день
+                        var completedToday = workItems
+                            .Where(w => w.IsCompleted && w.CompletedAt.HasValue && w.CompletedAt.Value == currentDate)
+                            .Sum(w => w.EstimatedHours);
+                        currentHours -= completedToday;
+
+                        if (currentHours < 0) currentHours = 0;
                     }
 
-                    var idealRemaining = Math.Max(0, totalHours - dailyIdealBurn * (currentDate - sprint.StartDate.Date).Days);
-                    var actualRemaining = Math.Max(0, remaining);
+                    var idealRemaining = idealStartHours * (1 - (decimal)i / days);
+                    if (idealRemaining < 0) idealRemaining = 0;
 
-                    burndownPoints.Add(new BurndownPoint
+                    points.Add(new BurndownPoint
                     {
                         Date = currentDate,
-                        RemainingHours = actualRemaining,
-                        IdealRemainingHours = idealRemaining,
+                        RemainingHours = currentHours,
+                        IdealRemainingHours = (decimal)idealRemaining,
                         RemainingStoryPoints = 0
                     });
-
-                    currentDate = currentDate.AddDays(1);
                 }
 
-                return ApiResponse<List<BurndownPoint>>.Ok(burndownPoints);
+                return ApiResponse<List<BurndownPoint>>.Ok(points);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Ошибка получения графика сгорания спринта {SprintId}", sprintId);
                 return ApiResponse<List<BurndownPoint>>.Fail("Произошла ошибка при получении данных графика");
             }
+        }
+
+        private class WorkItem
+        {
+            public decimal EstimatedHours { get; set; }
+            public DateTime CreatedAt { get; set; }
+            public DateTime? CompletedAt { get; set; }
+            public bool IsCompleted { get; set; }
         }
 
         public async Task<ApiResponse> SaveReviewNotesAsync(Guid sprintId, string notes)
